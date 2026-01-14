@@ -28,7 +28,7 @@ internal static class SourceGenerationHelpers
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
-        var typeBuilderNamespace = $"Macaron.InlineInterface.Implementations{GetNamespaceString(typeSymbol)}";
+        var typeBuilderNamespace = $"Macaron.InlineInterface.Generated{GetNamespaceString(typeSymbol)}";
 
         // get nested types
         var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
