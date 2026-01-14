@@ -140,36 +140,6 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
         stringBuilder.AppendLine();
 
-        // begin build method
-        stringBuilder.AppendLine($"{depthSpacerText}public static {type} Build({typeBuilder} builder)");
-        stringBuilder.AppendLine($"{depthSpacerText}{{");
-
-        depthSpacerText += Indent;
-
-        stringBuilder.Append($"{depthSpacerText}return new Impl(");
-
-        for (var i = 0; i < methodContexts.Length; i++)
-        {
-            var methodContext = methodContexts[i];
-
-            stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.ParameterName}: builder.{methodContext.UniqueName} ?? throw new global::System.InvalidOperationException()");
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.Append(",");
-            }
-        }
-
-        stringBuilder.Append($");");
-        stringBuilder.AppendLine();
-
-        // end build method
-        depthSpacerText = depthSpacerText[..^Indent.Length];
-
-        stringBuilder.AppendLine($"{depthSpacerText}}}");
-        stringBuilder.AppendLine();
-
         // begin builder methods
         for (var i = 0; i < methodContexts.Length; i++)
         {
@@ -184,6 +154,36 @@ internal static class SourceGenerationHelpers
         }
 
         // end builder methods
+        stringBuilder.AppendLine();
+
+        // begin build method
+        stringBuilder.AppendLine($"{depthSpacerText}public {type} Build(global::Macaron.InlineInterface.Tag _ = default)");
+        stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+        depthSpacerText += Indent;
+
+        stringBuilder.Append($"{depthSpacerText}return new Impl(");
+
+        for (var i = 0; i < methodContexts.Length; i++)
+        {
+            var methodContext = methodContexts[i];
+
+            stringBuilder.AppendLine();
+            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.ParameterName}: {methodContext.UniqueName} ?? throw new global::System.InvalidOperationException()");
+
+            if (i < methodContexts.Length - 1)
+            {
+                stringBuilder.Append(",");
+            }
+        }
+
+        stringBuilder.Append($");");
+        stringBuilder.AppendLine();
+
+        // end build method
+        depthSpacerText = depthSpacerText[..^Indent.Length];
+
+        stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // end builder type
         depthSpacerText = depthSpacerText[..^Indent.Length];
@@ -208,21 +208,39 @@ internal static class SourceGenerationHelpers
 
         depthSpacerText += Indent;
 
-        // extension method
+        // extension methods
         var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
 
-        stringBuilder.AppendLine($"{depthSpacerText}public static {type} Create{genericParameters}(");
+        foreach (var methodContext in methodContexts)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}this ImplementationOf<{type}> implementationOf,");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.DelegateType} impl)");
+
+            foreach (var constraint in genericParameterConstraints)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
+            }
+
+            // begin method body
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}({methodContext.UniqueName}: impl);");
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
+            stringBuilder.AppendLine();
+        }
+
+        // extension build method
+        stringBuilder.AppendLine($"{depthSpacerText}public static {type} Build{genericParameters}(");
         stringBuilder.AppendLine($"{depthSpacerText}{Indent}this ImplementationOf<{type}> implementationOf,");
-        stringBuilder.AppendLine($"{depthSpacerText}{Indent}global::System.Func<{globalTypeBuilder}, {globalTypeBuilder}> configure)");
+        stringBuilder.AppendLine($"{depthSpacerText}{Indent}global::Macaron.InlineInterface.Tag _ = default)");
 
         foreach (var constraint in genericParameterConstraints)
         {
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
         }
 
-        // begin method body
         stringBuilder.AppendLine($"{depthSpacerText}{{");
-        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return {globalTypeBuilder}.Build(configure(new {globalTypeBuilder}()));");
+        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}().Build(_);");
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // end extension class

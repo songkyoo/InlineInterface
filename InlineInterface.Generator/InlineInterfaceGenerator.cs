@@ -231,7 +231,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var typeContexts = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var uniqueTypeContexts = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         var valueProvider = context
             .SyntaxProvider
@@ -242,7 +242,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             .Where(static typeContext => typeContext != TypeContext.Empty)
             .Where(typeContext => typeContext switch
             {
-                ImplementationOfTypeContext { Symbol: { } symbol } => typeContexts.Add(symbol),
+                ImplementationOfTypeContext { Symbol: { } symbol } => uniqueTypeContexts.Add(symbol),
                 _ => true,
             })
             .Collect();
