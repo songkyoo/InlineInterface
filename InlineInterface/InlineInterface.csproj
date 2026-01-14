@@ -16,7 +16,6 @@
     <PackageLicenseExpression>Unlicense</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/songkyoo/InlineInterface</RepositoryUrl>
-    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
