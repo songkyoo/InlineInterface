@@ -132,9 +132,7 @@ public class InlineInterfaceGeneratorTests
 
             namespace Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests
             {
-                internal readonly record struct Parent_1_IPerson_1Builder<T0, T1>(
-                    global::System.Func<string>? GetName_0 = null,
-                    global::System.Action<string>? SetName_0 = null)
+                internal readonly struct Parent_1_IPerson_1Builder<T0, T1>
                 {
                     private sealed class Impl : global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>
                     {
@@ -153,6 +151,10 @@ public class InlineInterfaceGeneratorTests
 
                         public void SetName(string name) => _setName_0(name);
                     }
+
+                    private readonly global::System.Func<string>? GetName_0 { get; init; } = null;
+
+                    private readonly global::System.Action<string>? SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder<T0, T1> GetName(global::System.Func<string> impl) => this with { GetName_0 = impl };
 

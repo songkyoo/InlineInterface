@@ -52,24 +52,7 @@ internal static class SourceGenerationHelpers
         depthSpacerText += Indent;
 
         // begin builder type
-        stringBuilder.Append($"{depthSpacerText}internal readonly record struct {typeBuilder}(");
-
-        // builder constructor parameters
-        for (var i = 0; i < methodContexts.Length; i++)
-        {
-            var methodContext = methodContexts[i];
-
-            stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType}? {methodContext.UniqueName} = null");
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.Append(",");
-            }
-        }
-
-        stringBuilder.Append($")");
-        stringBuilder.AppendLine();
+        stringBuilder.AppendLine($"{depthSpacerText}internal readonly struct {typeBuilder}");
         stringBuilder.AppendLine($"{depthSpacerText}{{");
 
         depthSpacerText += Indent;
@@ -140,21 +123,19 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
         stringBuilder.AppendLine();
 
-        // begin builder methods
-        for (var i = 0; i < methodContexts.Length; i++)
+        // builder constructor parameters
+        foreach (var methodContext in methodContexts)
         {
-            var methodContext = methodContexts[i];
-
-            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {methodContext.Name}({methodContext.DelegateType} impl) => this with {{ {methodContext.UniqueName} = impl }};");
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.AppendLine();
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType}? {methodContext.UniqueName} {{ get; init; }} = null;");
+            stringBuilder.AppendLine();
         }
 
-        // end builder methods
-        stringBuilder.AppendLine();
+        // builder methods
+        foreach (var methodContext in methodContexts)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {methodContext.Name}({methodContext.DelegateType} impl) => this with {{ {methodContext.UniqueName} = impl }};");
+            stringBuilder.AppendLine();
+        }
 
         // begin build method
         stringBuilder.AppendLine($"{depthSpacerText}public {type} Build(global::Macaron.InlineInterface.Tag _ = default)");
