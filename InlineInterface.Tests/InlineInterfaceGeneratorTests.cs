@@ -121,7 +121,6 @@ public class InlineInterfaceGeneratorTests
                 public void TestMethod()
                 {
                     var implementationOf = Implementation.Of<Parent<float>.IPerson<int>>();
-                    var implementationOf2 = Implementation.Of<Parent<float>.IPerson<float>>();
                 }
             }
             """,

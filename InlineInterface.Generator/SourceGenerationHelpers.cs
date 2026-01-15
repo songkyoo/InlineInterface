@@ -123,7 +123,7 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
         stringBuilder.AppendLine();
 
-        // builder constructor parameters
+        // builder field members
         foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType}? {methodContext.UniqueName} {{ get; init; }} = null;");
