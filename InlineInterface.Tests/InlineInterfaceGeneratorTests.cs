@@ -156,8 +156,8 @@ public class InlineInterfaceGeneratorTests
                     private readonly global::System.Action<string>? SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
-                        global::System.Func<string> getName_0,
-                        global::System.Action<string> setName_0)
+                        global::System.Func<string>? getName_0 = null,
+                        global::System.Action<string>? setName_0 = null)
                     {
                         GetName_0 = getName_0;
                         SetName_0 = setName_0;

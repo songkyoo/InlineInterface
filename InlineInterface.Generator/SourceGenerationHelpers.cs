@@ -138,7 +138,7 @@ internal static class SourceGenerationHelpers
             var methodContext = methodContexts[i];
 
             stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType} {methodContext.ParameterName}");
+            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType}? {methodContext.ParameterName} = null");
 
             if (i < methodContexts.Length - 1)
             {
