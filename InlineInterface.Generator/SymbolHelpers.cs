@@ -57,7 +57,9 @@ internal static class SymbolHelpers
             if (methodSymbol.ReturnsVoid)
             {
                 returnType = "void";
-                delegateType = $"global::System.Action<{string.Join(", ", paramTypeList)}>";
+                delegateType = paramTypeList.Length > 0
+                    ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
+                    : $"global::System.Action";
             }
             else
             {
