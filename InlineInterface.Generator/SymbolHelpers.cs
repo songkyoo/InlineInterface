@@ -68,7 +68,7 @@ internal static class SymbolHelpers
                     UseSpecialTypes
                 ));
                 delegateType = paramTypeList.Length > 0
-                    ? $"global::System.Func<{paramList}, {returnType}>"
+                    ? $"global::System.Func<{paramTypeList}, {returnType}>"
                     : $"global::System.Func<{returnType}>";
             }
 
