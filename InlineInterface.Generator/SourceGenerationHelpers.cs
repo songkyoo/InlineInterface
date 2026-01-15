@@ -130,8 +130,38 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
         }
 
-        // builder constructor
-        stringBuilder.AppendLine($"{depthSpacerText}public {mergedTypePrefix}Builder() {{ }}");
+        // builder constructor parameters
+        stringBuilder.Append($"{depthSpacerText}public {mergedTypePrefix}Builder(");
+
+        for (var i = 0; i < methodContexts.Length; i++)
+        {
+            var methodContext = methodContexts[i];
+
+            stringBuilder.AppendLine();
+            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType} {methodContext.ParameterName}");
+
+            if (i < methodContexts.Length - 1)
+            {
+                stringBuilder.Append(",");
+            }
+        }
+
+        stringBuilder.Append($")");
+        stringBuilder.AppendLine();
+        stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+        // begin builder constructor body
+        depthSpacerText += Indent;
+
+        foreach (var methodContext in methodContexts)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.UniqueName} = {methodContext.ParameterName};");
+        }
+
+        // end builder constructor body
+        depthSpacerText = depthSpacerText[..^Indent.Length];
+
+        stringBuilder.AppendLine($"{depthSpacerText}}}");
         stringBuilder.AppendLine();
 
         // builder methods
@@ -209,7 +239,7 @@ internal static class SourceGenerationHelpers
 
             // begin method body
             stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}({methodContext.UniqueName}: impl);");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}({methodContext.ParameterName}: impl);");
             stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
