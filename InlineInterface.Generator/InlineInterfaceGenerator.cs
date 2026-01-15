@@ -16,7 +16,23 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
     #endregion
 
     #region Types
-    public record TypeContext(
+    private abstract record ExtractionResult
+    {
+        private ExtractionResult() { }
+
+        public sealed record Success(
+            INamedTypeSymbol Symbol,
+            TypeSyntax Syntax
+        ) : ExtractionResult;
+
+        public sealed record Failure(
+            Diagnostic Diagnostic
+        ) : ExtractionResult;
+
+        public sealed record NotApplicable() : ExtractionResult;
+    }
+
+    private record TypeContext(
         ImmutableArray<Diagnostic> Diagnostics
     )
     {
@@ -27,7 +43,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         #endregion
     }
 
-    public sealed record ImplementationOfTypeContext(
+    private sealed record ImplementationOfTypeContext(
         INamedTypeSymbol Symbol,
         ImmutableArray<IMethodSymbol> MethodSymbols,
         ImmutableArray<Diagnostic> Diagnostics
@@ -94,62 +110,87 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
     #endregion
 
     #region Static
-    public static TypeContext GetTypeContext(GeneratorSyntaxContext generatorSyntaxContext)
+    private static ExtractionResult ExtractTypeSymbol(GeneratorSyntaxContext generatorSyntaxContext)
     {
         if (generatorSyntaxContext.Node is not InvocationExpressionSyntax expressionSyntax)
         {
-            return TypeContext.Empty;
+            return new ExtractionResult.NotApplicable();
         }
 
         if (GetGenericNameFromInvocation(expressionSyntax) is not { } genericNameSyntax)
         {
-            return TypeContext.Empty;
+            return new ExtractionResult.NotApplicable();
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
         var methodSymbol = semanticModel.GetSymbolInfo(genericNameSyntax).Symbol as IMethodSymbol;
+
         if (methodSymbol?.IsStatic is not true || methodSymbol.Name != "Of")
         {
-            return TypeContext.Empty;
+            return new ExtractionResult.NotApplicable();
         }
 
         var typeArgumentList = genericNameSyntax.TypeArgumentList;
-        if (typeArgumentList.Arguments is not [{ } typeArgument] ||
-            semanticModel.GetSymbolInfo(typeArgument).Symbol is not INamedTypeSymbol { ConstructedFrom: { } typeSymbol }
-        )
+        if (typeArgumentList.Arguments is not [{ } typeArgumentSyntax])
         {
-            return TypeContext.Empty;
+            return new ExtractionResult.NotApplicable();
+        }
+
+        if (semanticModel.GetSymbolInfo(typeArgumentSyntax).Symbol is not INamedTypeSymbol
+        {
+            ConstructedFrom: { } typeSymbol,
+        })
+        {
+            return new ExtractionResult.NotApplicable();
         }
 
         if (methodSymbol.ContainingType.ToDisplayString(FullyQualifiedFormat) != ImplementationTypeString)
         {
-            return TypeContext.Empty;
+            return new ExtractionResult.NotApplicable();
         }
 
         if (typeSymbol.TypeKind != TypeKind.Interface)
         {
-            return TypeContext.Empty with
-            {
-                Diagnostics = ImmutableArray.Create(Diagnostic.Create(
+            return new ExtractionResult.Failure(
+                Diagnostic: Diagnostic.Create(
                     descriptor: TargetTypeMustBeInterfaceRule,
-                    location: typeArgument.GetLocation(),
-                    messageArgs: [typeArgument]
-                )),
-            };
+                    location: typeArgumentSyntax.GetLocation(),
+                    messageArgs: [typeArgumentSyntax]
+                )
+            );
         }
 
-        if (typeArgument.ToString().EndsWith("?"))
+        if (typeArgumentSyntax.ToString().EndsWith("?"))
         {
-            return TypeContext.Empty with
-            {
-                Diagnostics = ImmutableArray.Create(Diagnostic.Create(
+            return new ExtractionResult.Failure(
+                Diagnostic: Diagnostic.Create(
                     descriptor: TargetTypeCannotBeNullableRule,
-                    location: typeArgument.GetLocation(),
-                    messageArgs: [typeArgument]
-                )),
-            };
+                    location: typeArgumentSyntax.GetLocation(),
+                    messageArgs: [typeArgumentSyntax]
+                )
+            );
         }
 
+        return new ExtractionResult.Success(
+            Symbol: typeSymbol,
+            Syntax: typeArgumentSyntax
+        );
+
+        #region Local Functions
+        static GenericNameSyntax? GetGenericNameFromInvocation(InvocationExpressionSyntax invocationExpressionSyntax)
+        {
+            return invocationExpressionSyntax.Expression switch
+            {
+                MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName } => genericName,
+                GenericNameSyntax genericName => genericName,
+                _ => null,
+            };
+        }
+        #endregion
+    }
+
+    private static TypeContext ValidateTypeSymbol(INamedTypeSymbol typeSymbol, TypeSyntax typeSyntax)
+    {
         var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -161,8 +202,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 {
                     diagnosticsBuilder.Add(Diagnostic.Create(
                         descriptor: NotAllowedPropertyMemberRule,
-                        location: typeArgument.GetLocation(),
-                        messageArgs: [typeArgument, property.Name]
+                        location: typeSyntax.GetLocation(),
+                        messageArgs: [typeSyntax, property.Name]
                     ));
 
                     break;
@@ -171,21 +212,20 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 {
                     diagnosticsBuilder.Add(Diagnostic.Create(
                         descriptor: NotAllowedEventMemberRule,
-                        location: typeArgument.GetLocation(),
-                        messageArgs: [typeArgument, @event.Name]
+                        location: typeSyntax.GetLocation(),
+                        messageArgs: [typeSyntax, @event.Name]
                     ));
 
                     break;
                 }
                 case IMethodSymbol { IsStatic: false } method:
                 {
-                    // 제네릭 메서드 체크
                     if (method.IsGenericMethod)
                     {
                         diagnosticsBuilder.Add(Diagnostic.Create(
                             descriptor: NotAllowedGenericMethodRule,
-                            location: typeArgument.GetLocation(),
-                            messageArgs: [typeArgument, method.Name]
+                            location: typeSyntax.GetLocation(),
+                            messageArgs: [typeSyntax, method.Name]
                         ));
 
                         break;
@@ -198,8 +238,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                     {
                         diagnosticsBuilder.Add(Diagnostic.Create(
                             descriptor: NotAllowedMethodModifierRule,
-                            location: typeArgument.GetLocation(),
-                            messageArgs: [typeArgument, method.Name]
+                            location: typeSyntax.GetLocation(),
+                            messageArgs: [typeSyntax, method.Name]
                         ));
 
                         break;
@@ -217,8 +257,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 {
                     diagnosticsBuilder.Add(Diagnostic.Create(
                         descriptor: UnexpectedMemberTypeRule,
-                        location: typeArgument.GetLocation(),
-                        messageArgs: [typeArgument, member.Kind, member.Name]
+                        location: typeSyntax.GetLocation(),
+                        messageArgs: [typeSyntax, member.Kind, member.Name]
                     ));
 
                     break;
@@ -239,58 +279,78 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             MethodSymbols: methodSymbolsBuilder.ToImmutable(),
             Diagnostics: ImmutableArray<Diagnostic>.Empty
         );
-
-        #region Local Functions
-        static GenericNameSyntax? GetGenericNameFromInvocation(InvocationExpressionSyntax invocationExpressionSyntax)
-        {
-            return invocationExpressionSyntax.Expression switch
-            {
-                MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName } => genericName,
-                GenericNameSyntax genericName => genericName,
-                _ => null,
-            };
-        }
-        #endregion
     }
     #endregion
 
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var uniqueTypeContexts = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-
-        var valueProvider = context
+        var typeSymbolProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (syntaxNode, _) => syntaxNode is InvocationExpressionSyntax,
-                transform: static (generatorSyntaxContext, _) => GetTypeContext(generatorSyntaxContext)
+                transform: static (generatorSyntaxContext, _) => ExtractTypeSymbol(generatorSyntaxContext)
             )
-            .Where(static typeContext => typeContext != TypeContext.Empty)
-            .Where(typeContext => typeContext switch
+            .Where(static result => result is not ExtractionResult.NotApplicable);
+
+        var validatedProvider = typeSymbolProvider
+            .Collect()
+            .SelectMany(static (results, _) =>
             {
-                ImplementationOfTypeContext { Symbol: { } symbol } => uniqueTypeContexts.Add(symbol),
-                _ => true,
-            })
-            .Collect();
+                var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+                var builder = ImmutableArray.CreateBuilder<TypeContext>();
+
+                foreach (var result in results)
+                {
+                    switch (result)
+                    {
+                        case ExtractionResult.Failure failure:
+                        {
+                            builder.Add(TypeContext.Empty with
+                            {
+                                Diagnostics = ImmutableArray.Create(failure.Diagnostic)
+                            });
+
+                            break;
+                        }
+                        case ExtractionResult.Success success:
+                        {
+                            if (!seenTypes.Add(success.Symbol))
+                            {
+                                continue;
+                            }
+
+                            var typeContext = ValidateTypeSymbol(success.Symbol, success.Syntax);
+
+                            builder.Add(typeContext);
+
+                            break;
+                        }
+                    }
+                }
+
+                return builder.ToImmutable();
+            });
 
         context.RegisterSourceOutput(
-            source: valueProvider,
-            action: (sourceProductionContext, typeContexts) =>
+            source: validatedProvider,
+            action: (sourceProductionContext, typeContext) =>
             {
-                foreach (var diagnostic in typeContexts.SelectMany(static context => context.Diagnostics))
+                foreach (var diagnostic in typeContext.Diagnostics)
                 {
                     sourceProductionContext.ReportDiagnostic(diagnostic);
                 }
 
-                foreach (var typeContext in typeContexts.OfType<ImplementationOfTypeContext>())
+                if (typeContext is ImplementationOfTypeContext implementationContext)
                 {
                     AddSource(
                         context: sourceProductionContext,
-                        typeSymbol: typeContext.Symbol,
-                        methodSymbols: typeContext.MethodSymbols
+                        typeSymbol: implementationContext.Symbol,
+                        methodSymbols: implementationContext.MethodSymbols
                     );
                 }
-            });
+            }
+        );
     }
     #endregion
 }
