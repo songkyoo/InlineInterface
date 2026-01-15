@@ -130,6 +130,10 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
         }
 
+        // builder constructor
+        stringBuilder.AppendLine($"{depthSpacerText}public {mergedTypePrefix}Builder() {{ }}");
+        stringBuilder.AppendLine();
+
         // builder methods
         foreach (var methodContext in methodContexts)
         {
