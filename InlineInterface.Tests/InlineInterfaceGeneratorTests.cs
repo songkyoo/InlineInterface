@@ -151,14 +151,18 @@ public class InlineInterfaceGeneratorTests
                         public void SetName(string name) => _setName_0(name);
                     }
 
+                    private readonly global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>? _base;
+
                     private readonly global::System.Func<string>? GetName_0 { get; init; } = null;
 
                     private readonly global::System.Action<string>? SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
+                        global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>? @base,
                         global::System.Func<string>? getName_0 = null,
                         global::System.Action<string>? setName_0 = null)
                     {
+                        _base = @base;
                         GetName_0 = getName_0;
                         SetName_0 = setName_0;
                     }
@@ -169,9 +173,12 @@ public class InlineInterfaceGeneratorTests
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
+                        global::System.Func<string>? getName_0 = _base != null ? _base.GetName : null;
+                        global::System.Action<string>? setName_0 = _base != null ? _base.SetName : null;
+
                         return new Impl(
-                            getName_0: GetName_0 ?? throw new global::System.InvalidOperationException(),
-                            setName_0: SetName_0 ?? throw new global::System.InvalidOperationException());
+                            getName_0: GetName_0 ?? getName_0 ?? throw new global::System.InvalidOperationException(),
+                            setName_0: SetName_0 ?? setName_0 ?? throw new global::System.InvalidOperationException());
                     }
                 }
             }
@@ -181,24 +188,24 @@ public class InlineInterfaceGeneratorTests
                 internal static partial class ImplementationOfExtensions
                 {
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> GetName<T0, T1>(
-                        this ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
                         global::System.Func<string> impl)
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(getName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, getName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> SetName<T0, T1>(
-                        this ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
                         global::System.Action<string> impl)
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(setName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, setName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build<T0, T1>(
-                        this ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
                         global::Macaron.InlineInterface.Tag _ = default)
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>().Build(_);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base).Build(_);
                     }
                 }
             }
