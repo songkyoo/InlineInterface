@@ -186,11 +186,21 @@ internal static class SourceGenerationHelpers
 
         foreach (var methodContext in methodContexts)
         {
-            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.DelegateType}? {methodContext.ParameterName} = _base != null ? _base.{methodContext.Name} : null;");
+            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.DelegateType}? {methodContext.ParameterName} = null;");
         }
 
         if (methodContexts.Length > 0)
         {
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine($"{depthSpacerText}if (_base != null)");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+            foreach (var methodContext in methodContexts)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = _base.{methodContext.Name};");
+            }
+
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
 

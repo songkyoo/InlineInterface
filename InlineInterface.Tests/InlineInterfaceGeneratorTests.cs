@@ -173,8 +173,14 @@ public class InlineInterfaceGeneratorTests
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
-                        global::System.Func<string>? getName_0 = _base != null ? _base.GetName : null;
-                        global::System.Action<string>? setName_0 = _base != null ? _base.SetName : null;
+                        global::System.Func<string>? getName_0 = null;
+                        global::System.Action<string>? setName_0 = null;
+
+                        if (_base != null)
+                        {
+                            getName_0 = _base.GetName;
+                            setName_0 = _base.SetName;
+                        }
 
                         return new Impl(
                             getName_0: GetName_0 ?? getName_0 ?? throw new global::System.InvalidOperationException(),
