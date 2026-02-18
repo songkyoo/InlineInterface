@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Text;
 using static System.Linq.Enumerable;
 using static Macaron.InlineInterface.SymbolHelpers;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
+using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
@@ -16,6 +17,7 @@ internal static class SourceGenerationHelpers
     public static void AddSource(
         SourceProductionContext context,
         INamedTypeSymbol typeSymbol,
+        ImmutableArray<IEventSymbol> eventSymbols,
         ImmutableArray<IMethodSymbol> methodSymbols
     )
     {
@@ -103,6 +105,33 @@ internal static class SourceGenerationHelpers
 
         stringBuilder.AppendLine($"{depthSpacerText}}}");
         stringBuilder.AppendLine();
+
+        // impl event implementations
+        for (var i = 0; i < eventSymbols.Length; i++)
+        {
+            var eventSymbol = eventSymbols[i];
+            var eventType = eventSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+                IncludeNullableReferenceTypeModifier |
+                UseSpecialTypes
+            ));
+
+            if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+            {
+                eventType += "?";
+            }
+
+            stringBuilder.AppendLine($"{depthSpacerText}public event {eventType} {eventSymbol.Name};");
+
+            if (i < eventSymbols.Length - 1)
+            {
+                stringBuilder.AppendLine();
+            }
+        }
+
+        if (eventSymbols.Length > 0)
+        {
+            stringBuilder.AppendLine();
+        }
 
         // impl method implementations
         for (var i = 0; i < methodContexts.Length; i++)

@@ -104,12 +104,18 @@ public class InlineInterfaceGeneratorTests
         AssertGeneratedCode(
             sourceCode:
             """
+            using System;
+
             namespace Macaron.InlineInterface.Tests;
+
+            public class Foo { }
 
             public class Parent<T>
             {
                 public interface IPerson<T>
                 {
+                    event Func<Foo?, string> NameChanged;
+
                     string GetName();
 
                     void SetName(string name);
@@ -145,6 +151,8 @@ public class InlineInterfaceGeneratorTests
                             _getName_0 = getName_0;
                             _setName_0 = setName_0;
                         }
+
+                        public event global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? NameChanged;
 
                         public string GetName() => _getName_0();
 
@@ -269,23 +277,6 @@ public class InlineInterfaceGeneratorTests
     }
 
     [Test]
-    public void When_TargetTypeHasEvent_Should_ReportDiagnostic()
-    {
-        AssertDiagnostic(
-            sourceCode:
-            """
-            using Macaron.InlineInterface;
-            using System;
-
-            public interface IWithEvent { event EventHandler Click; }
-
-            public class Test { void M() => Implementation.Of<IWithEvent>(); }
-            """,
-            expectedDiagnosticId: "MII0004"
-        );
-    }
-
-    [Test]
     public void When_TargetTypeHasGenericMethod_Should_ReportDiagnostic()
     {
         AssertDiagnostic(
@@ -297,7 +288,7 @@ public class InlineInterfaceGeneratorTests
 
             public class Test { void M() => Implementation.Of<IWithGenericMethod>(); }
             """,
-            expectedDiagnosticId: "MII0005"
+            expectedDiagnosticId: "MII0004"
         );
     }
 
@@ -313,7 +304,7 @@ public class InlineInterfaceGeneratorTests
 
             public class Test { void M() => Implementation.Of<IWithRefParam>(); }
             """,
-            expectedDiagnosticId: "MII0006"
+            expectedDiagnosticId: "MII0005"
         );
     }
 }

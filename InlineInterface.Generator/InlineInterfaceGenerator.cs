@@ -29,7 +29,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             Diagnostic Diagnostic
         ) : ExtractionResult;
 
-        public sealed record NotApplicable() : ExtractionResult;
+        public sealed record NotApplicable : ExtractionResult;
     }
 
     private record TypeContext(
@@ -45,6 +45,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
     private sealed record ImplementationOfTypeContext(
         INamedTypeSymbol Symbol,
+        ImmutableArray<IEventSymbol> EventSymbols,
         ImmutableArray<IMethodSymbol> MethodSymbols,
         ImmutableArray<Diagnostic> Diagnostics
     ) : TypeContext(Diagnostics);
@@ -75,16 +76,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
-    private static readonly DiagnosticDescriptor NotAllowedEventMemberRule = new(
-        id: "MII0004",
-        title: "Event members are not allowed",
-        messageFormat: "Event '{1}' is not allowed in target interface '{0}'. Inline interfaces only support method members.",
-        category: "Usage",
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
     private static readonly DiagnosticDescriptor NotAllowedGenericMethodRule = new(
-        id: "MII0005",
+        id: "MII0004",
         title: "Generic methods are not allowed",
         messageFormat: "Generic method '{1}' is not allowed in target interface '{0}'. Inline interfaces do not support generic methods.",
         category: "Usage",
@@ -92,7 +85,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor NotAllowedMethodModifierRule = new(
-        id: "MII0006",
+        id: "MII0005",
         title: "Method parameter modifiers are not allowed",
         messageFormat: "Method '{1}' in target interface '{0}' has unsupported parameter modifiers (ref, out, in, or params). Only value and reference parameters are supported.",
         category: "Usage",
@@ -100,9 +93,9 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor UnexpectedMemberTypeRule = new(
-        id: "MII0007",
+        id: "MII0006",
         title: "Unexpected member type",
-        messageFormat: "Unexpected member '{2}' of type '{1}' found in target interface '{0}'. This member will be ignored.",
+        messageFormat: "Unexpected member '{2}' of type '{1}' found in target interface '{0}'.",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
@@ -191,6 +184,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
     private static TypeContext ValidateTypeSymbol(INamedTypeSymbol typeSymbol, TypeSyntax typeSyntax)
     {
+        var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
         var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -210,16 +204,20 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 }
                 case IEventSymbol { IsStatic: false } @event:
                 {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: NotAllowedEventMemberRule,
-                        location: typeSyntax.GetLocation(),
-                        messageArgs: [typeSyntax, @event.Name]
-                    ));
+                    eventSymbolsBuilder.Add(@event);
 
                     break;
                 }
                 case IMethodSymbol { IsStatic: false } method:
                 {
+                    if (method.MethodKind
+                        is MethodKind.EventAdd or MethodKind.EventRemove
+                        or MethodKind.PropertyGet or MethodKind.PropertySet
+                    )
+                    {
+                        break;
+                    }
+
                     if (method.IsGenericMethod)
                     {
                         diagnosticsBuilder.Add(Diagnostic.Create(
@@ -276,6 +274,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
         return new ImplementationOfTypeContext(
             Symbol: typeSymbol,
+            EventSymbols: eventSymbolsBuilder.ToImmutable(),
             MethodSymbols: methodSymbolsBuilder.ToImmutable(),
             Diagnostics: ImmutableArray<Diagnostic>.Empty
         );
@@ -346,6 +345,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                     AddSource(
                         context: sourceProductionContext,
                         typeSymbol: implementationContext.Symbol,
+                        eventSymbols: implementationContext.EventSymbols,
                         methodSymbols: implementationContext.MethodSymbols
                     );
                 }

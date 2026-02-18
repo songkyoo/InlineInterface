@@ -145,7 +145,7 @@ internal static class SymbolHelpers
         }
 
         return constraints.Count > 0
-            ? $"where {nameSelector.Invoke(typeParameterSymbol.Name)} : {string.Join(", ", constraints)}"
+            ? $"where {nameSelector(typeParameterSymbol.Name)} : {string.Join(", ", constraints)}"
             : "";
     }
 }
