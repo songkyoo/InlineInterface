@@ -18,6 +18,7 @@ internal static class SourceGenerationHelpers
         SourceProductionContext context,
         INamedTypeSymbol typeSymbol,
         ImmutableArray<IEventSymbol> eventSymbols,
+        ImmutableArray<IPropertySymbol> propertySymbols,
         ImmutableArray<IMethodSymbol> methodSymbols
     )
     {
@@ -26,6 +27,7 @@ internal static class SourceGenerationHelpers
             genericParameters,
             genericParameterConstraints
         ) = GetTypeStrings(typeSymbol);
+        var propertyContexts = CreatePropertyContexts(propertySymbols);
         var methodContexts = CreateMethodContexts(methodSymbols);
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
@@ -65,9 +67,30 @@ internal static class SourceGenerationHelpers
 
         depthSpacerText += Indent;
 
+        foreach (var propertyContext in propertyContexts)
+        {
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterFieldName: { } getterFieldName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}private readonly {getterDelegateType} {getterFieldName};");
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterFieldName: { } setterFieldName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}private readonly {setterDelegateType} {setterFieldName};");
+            }
+        }
+
         foreach (var methodContext in methodContexts)
         {
-            stringBuilder.AppendLine($"{depthSpacerText}readonly {methodContext.DelegateType} {methodContext.FieldName};");
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType} {methodContext.FieldName};");
         }
 
         stringBuilder.AppendLine();
@@ -75,17 +98,39 @@ internal static class SourceGenerationHelpers
         // impl constructor parameters
         stringBuilder.Append($"{depthSpacerText}public Impl(");
 
-        for (var i = 0; i < methodContexts.Length; i++)
+        var implConstructorParams = new List<string>();
+
+        foreach (var propertyContext in propertyContexts)
         {
-            var methodContext = methodContexts[i];
-
-            stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType} {methodContext.ParameterName}");
-
-            if (i < methodContexts.Length - 1)
+            if (propertyContext is
             {
-                stringBuilder.Append(",");
+                GetterDelegateType: { } getterDelegateType,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                implConstructorParams.Add($"{getterDelegateType} {getterParameterName}");
             }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                implConstructorParams.Add($"{setterDelegateType} {setterParameterName}");
+            }
+        }
+
+        foreach (var methodContext in methodContexts)
+        {
+            implConstructorParams.Add($"{methodContext.DelegateType} {methodContext.ParameterName}");
+        }
+
+        if (implConstructorParams.Count > 0)
+        {
+            stringBuilder.AppendLine();
+            stringBuilder.Append($"{depthSpacerText}{Indent}");
+            stringBuilder.Append(string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", implConstructorParams));
         }
 
         stringBuilder.Append($")");
@@ -94,6 +139,27 @@ internal static class SourceGenerationHelpers
 
         // begin impl constructor body
         depthSpacerText += Indent;
+
+        foreach (var propertyContext in propertyContexts)
+        {
+            if (propertyContext is
+            {
+                GetterFieldName: { } getterFieldName,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{getterFieldName} = {getterParameterName};");
+            }
+
+            if (propertyContext is
+            {
+                SetterFieldName: { } setterFieldName,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{setterFieldName} = {setterParameterName};");
+            }
+        }
 
         foreach (var methodContext in methodContexts)
         {
@@ -104,9 +170,13 @@ internal static class SourceGenerationHelpers
         depthSpacerText = depthSpacerText[..^Indent.Length];
 
         stringBuilder.AppendLine($"{depthSpacerText}}}");
-        stringBuilder.AppendLine();
 
         // impl event implementations
+        if (eventSymbols.Length > 0)
+        {
+            stringBuilder.AppendLine();
+        }
+
         for (var i = 0; i < eventSymbols.Length; i++)
         {
             var eventSymbol = eventSymbols[i];
@@ -128,12 +198,33 @@ internal static class SourceGenerationHelpers
             }
         }
 
-        if (eventSymbols.Length > 0)
+        // impl property implementations
+        if (propertyContexts.Length > 0)
         {
             stringBuilder.AppendLine();
         }
 
+        for (var i = 0; i < propertyContexts.Length; i++)
+        {
+            var propertyContext = propertyContexts[i];
+
+            foreach (var line in propertyContext.Implementation)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
+            }
+
+            if (i < methodContexts.Length - 1)
+            {
+                stringBuilder.AppendLine();
+            }
+        }
+
         // impl method implementations
+        if (methodContexts.Length > 0)
+        {
+            stringBuilder.AppendLine();
+        }
+
         for (var i = 0; i < methodContexts.Length; i++)
         {
             var methodContext = methodContexts[i];
@@ -156,6 +247,29 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}private readonly {type}? _base;");
         stringBuilder.AppendLine();
 
+        foreach (var propertyContext in propertyContexts)
+        {
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterName: { } getterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}private readonly {getterDelegateType}? {getterName} {{ get; init; }} = null;");
+                stringBuilder.AppendLine();
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterName: { } setterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}private readonly {setterDelegateType}? {setterName} {{ get; init; }} = null;");
+                stringBuilder.AppendLine();
+            }
+        }
+
         foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType}? {methodContext.UniqueName} {{ get; init; }} = null;");
@@ -167,22 +281,39 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
         stringBuilder.Append($"{depthSpacerText}{Indent}{type}? @base");
 
-        if (methodContexts.Length > 0)
+        var builderConstructorParams = new List<string>();
+
+        foreach (var propertyContext in propertyContexts)
         {
-            stringBuilder.Append(",");
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                builderConstructorParams.Add($"{getterDelegateType}? {getterParameterName} = null");
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                builderConstructorParams.Add($"{setterDelegateType}? {setterParameterName} = null");
+            }
         }
 
-        for (var i = 0; i < methodContexts.Length; i++)
+        foreach (var methodContext in methodContexts)
         {
-            var methodContext = methodContexts[i];
+            builderConstructorParams.Add($"{methodContext.DelegateType}? {methodContext.ParameterName} = null");
+        }
 
-            stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.DelegateType}? {methodContext.ParameterName} = null");
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.Append(",");
-            }
+        if (builderConstructorParams.Count > 0)
+        {
+            stringBuilder.AppendLine(",");
+            stringBuilder.Append($"{depthSpacerText}{Indent}");
+            stringBuilder.Append(string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", builderConstructorParams));
         }
 
         stringBuilder.Append($")");
@@ -193,6 +324,27 @@ internal static class SourceGenerationHelpers
         depthSpacerText += Indent;
 
         stringBuilder.AppendLine($"{depthSpacerText}_base = @base;");
+
+        foreach (var propertyContext in propertyContexts)
+        {
+            if (propertyContext is
+            {
+                GetterName: { } getterName,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{getterName} = {getterParameterName};");
+            }
+
+            if (propertyContext is
+            {
+                SetterName: { } setterName,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{setterName} = {setterParameterName};");
+            }
+        }
 
         foreach (var methodContext in methodContexts)
         {
@@ -206,6 +358,35 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
 
         // builder methods
+        foreach (var propertyContext in propertyContexts)
+        {
+            var parameters = new List<string>();
+            var expressions = new List<string>();
+
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterName: { } getterName,
+            })
+            {
+                parameters.Add($"{getterDelegateType} getter");
+                expressions.Add($"{getterName} = getter");
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterName: { } setterName,
+            })
+            {
+                parameters.Add($"{setterDelegateType} setter");
+                expressions.Add($"{setterName} = setter");
+            }
+
+            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {propertyContext.Name}({string.Join(", ", parameters)}) => this with {{ {string.Join(", ", expressions)} }};");
+            stringBuilder.AppendLine();
+        }
+
         foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {methodContext.Name}({methodContext.DelegateType} impl) => this with {{ {methodContext.UniqueName} = impl }};");
@@ -218,16 +399,56 @@ internal static class SourceGenerationHelpers
 
         depthSpacerText += Indent;
 
+        foreach (var propertyContext in propertyContexts)
+        {
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{getterDelegateType}? {getterParameterName} = null;");
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{setterDelegateType}? {setterParameterName} = null;");
+            }
+        }
+
         foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine($"{depthSpacerText}{methodContext.DelegateType}? {methodContext.ParameterName} = null;");
         }
 
-        if (methodContexts.Length > 0)
+        if (propertyContexts.Length + methodContexts.Length > 0)
         {
             stringBuilder.AppendLine();
             stringBuilder.AppendLine($"{depthSpacerText}if (_base != null)");
             stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+            foreach (var propertyContext in propertyContexts)
+            {
+                if (propertyContext is
+                {
+                    GetterParameterName: { } getterParameterName,
+                })
+                {
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = () => _base.{propertyContext.Name};");
+                }
+
+                if (propertyContext is
+                {
+                    SetterParameterName: { } setterParameterName,
+                })
+                {
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = value => _base.{propertyContext.Name} = value;");
+                }
+            }
 
             foreach (var methodContext in methodContexts)
             {
@@ -240,17 +461,39 @@ internal static class SourceGenerationHelpers
 
         stringBuilder.Append($"{depthSpacerText}return new Impl(");
 
-        for (var i = 0; i < methodContexts.Length; i++)
+        var implConstructorArgs = new List<string>();
+
+        foreach (var propertyContext in propertyContexts)
         {
-            var methodContext = methodContexts[i];
-
-            stringBuilder.AppendLine();
-            stringBuilder.Append($"{depthSpacerText}{Indent}{methodContext.ParameterName}: {methodContext.UniqueName} ?? {methodContext.ParameterName} ?? throw new global::System.InvalidOperationException()");
-
-            if (i < methodContexts.Length - 1)
+            if (propertyContext is
             {
-                stringBuilder.Append(",");
+                GetterName: { } getterName,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                implConstructorArgs.Add($"{getterParameterName}: {getterName} ?? {getterParameterName} ?? throw new global::System.InvalidOperationException()");
             }
+
+            if (propertyContext is
+            {
+                SetterName: { } setterName,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                implConstructorArgs.Add($"{setterParameterName}: {setterName} ?? {setterParameterName} ?? throw new global::System.InvalidOperationException()");
+            }
+        }
+
+        foreach (var methodContext in methodContexts)
+        {
+            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.UniqueName} ?? {methodContext.ParameterName} ?? throw new global::System.InvalidOperationException()");
+        }
+
+        if (implConstructorArgs.Count > 0)
+        {
+            stringBuilder.AppendLine();
+            stringBuilder.Append($"{depthSpacerText}{Indent}");
+            stringBuilder.Append(string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", implConstructorArgs));
         }
 
         stringBuilder.Append($");");
@@ -287,18 +530,61 @@ internal static class SourceGenerationHelpers
         // extension methods
         var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
 
+        foreach (var propertyContext in propertyContexts)
+        {
+            var parameters = new List<string>();
+            var expressions = new List<string>();
+
+            if (propertyContext is
+            {
+                GetterDelegateType: { } getterDelegateType,
+                GetterParameterName: { } getterParameterName,
+            })
+            {
+                parameters.Add($"{getterDelegateType} getter");
+                expressions.Add($"{getterParameterName}: getter");
+            }
+
+            if (propertyContext is
+            {
+                SetterDelegateType: { } setterDelegateType,
+                SetterParameterName: { } setterParameterName,
+            })
+            {
+                parameters.Add($"{setterDelegateType} setter");
+                expressions.Add($"{setterParameterName}: setter");
+            }
+
+            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {propertyContext.Name}{genericParameters}(");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", parameters)})");
+
+            // constraints
+            foreach (var constraint in genericParameterConstraints)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
+            }
+
+            // method body
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(@base: implementationOf.Base, {string.Join(", ", expressions)});");
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
+            stringBuilder.AppendLine();
+        }
+
         foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.DelegateType} impl)");
 
+            // constraints
             foreach (var constraint in genericParameterConstraints)
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
             }
 
-            // begin method body
+            // method body
             stringBuilder.AppendLine($"{depthSpacerText}{{");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(@base: implementationOf.Base, {methodContext.ParameterName}: impl);");
             stringBuilder.AppendLine($"{depthSpacerText}}}");

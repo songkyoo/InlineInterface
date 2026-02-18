@@ -46,6 +46,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
     private sealed record ImplementationOfTypeContext(
         INamedTypeSymbol Symbol,
         ImmutableArray<IEventSymbol> EventSymbols,
+        ImmutableArray<IPropertySymbol> PropertySymbols,
         ImmutableArray<IMethodSymbol> MethodSymbols,
         ImmutableArray<Diagnostic> Diagnostics
     ) : TypeContext(Diagnostics);
@@ -68,16 +69,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
-    private static readonly DiagnosticDescriptor NotAllowedPropertyMemberRule = new(
-        id: "MII0003",
-        title: "Property members are not allowed",
-        messageFormat: "Property '{1}' is not allowed in target interface '{0}'. Inline interfaces only support method members.",
-        category: "Usage",
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
     private static readonly DiagnosticDescriptor NotAllowedGenericMethodRule = new(
-        id: "MII0004",
+        id: "MII0003",
         title: "Generic methods are not allowed",
         messageFormat: "Generic method '{1}' is not allowed in target interface '{0}'. Inline interfaces do not support generic methods.",
         category: "Usage",
@@ -85,7 +78,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor NotAllowedMethodModifierRule = new(
-        id: "MII0005",
+        id: "MII0004",
         title: "Method parameter modifiers are not allowed",
         messageFormat: "Method '{1}' in target interface '{0}' has unsupported parameter modifiers (ref, out, in, or params). Only value and reference parameters are supported.",
         category: "Usage",
@@ -93,7 +86,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor UnexpectedMemberTypeRule = new(
-        id: "MII0006",
+        id: "MII0005",
         title: "Unexpected member type",
         messageFormat: "Unexpected member '{2}' of type '{1}' found in target interface '{0}'.",
         category: "Usage",
@@ -185,6 +178,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
     private static TypeContext ValidateTypeSymbol(INamedTypeSymbol typeSymbol, TypeSyntax typeSyntax)
     {
         var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
+        var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
         var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -194,11 +188,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             {
                 case IPropertySymbol { IsStatic: false } property:
                 {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: NotAllowedPropertyMemberRule,
-                        location: typeSyntax.GetLocation(),
-                        messageArgs: [typeSyntax, property.Name]
-                    ));
+                    propertySymbolsBuilder.Add(property);
 
                     break;
                 }
@@ -275,6 +265,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         return new ImplementationOfTypeContext(
             Symbol: typeSymbol,
             EventSymbols: eventSymbolsBuilder.ToImmutable(),
+            PropertySymbols: propertySymbolsBuilder.ToImmutable(),
             MethodSymbols: methodSymbolsBuilder.ToImmutable(),
             Diagnostics: ImmutableArray<Diagnostic>.Empty
         );
@@ -346,6 +337,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                         context: sourceProductionContext,
                         typeSymbol: implementationContext.Symbol,
                         eventSymbols: implementationContext.EventSymbols,
+                        propertySymbols: implementationContext.PropertySymbols,
                         methodSymbols: implementationContext.MethodSymbols
                     );
                 }

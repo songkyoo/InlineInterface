@@ -9,6 +9,20 @@ namespace Macaron.InlineInterface;
 
 internal static class SymbolHelpers
 {
+    public sealed record PropertyContext(
+        string Type,
+        string? GetterDelegateType,
+        string? SetterDelegateType,
+        string Name,
+        string? GetterName,
+        string? SetterName,
+        string? GetterParameterName,
+        string? SetterParameterName,
+        string? GetterFieldName,
+        string? SetterFieldName,
+        ImmutableArray<string> Implementation
+    );
+
     public sealed record MethodContext(
         string DelegateType,
         string Name,
@@ -17,6 +31,87 @@ internal static class SymbolHelpers
         string FieldName,
         string Implementation
     );
+
+    public static ImmutableArray<PropertyContext> CreatePropertyContexts(
+        ImmutableArray<IPropertySymbol> propertySymbols
+    )
+    {
+        var builder = ImmutableArray.CreateBuilder<PropertyContext>();
+
+        foreach (var propertySymbol in propertySymbols)
+        {
+            var propertyName = propertySymbol.Name;
+            var propertyType = propertySymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+                IncludeNullableReferenceTypeModifier |
+                UseSpecialTypes
+            ));
+
+            string? getterDelegateType;
+            string? setterDelegateType;
+            string? getterName;
+            string? setterName;
+            string? getterParameterName;
+            string? setterParameterName;
+            string? getterFieldName;
+            string? setterFieldName;
+            var implementationLines = ImmutableArray.CreateBuilder<string>();
+
+            implementationLines.Add($"public {propertyType} {propertyName}");
+            implementationLines.Add($"{{");
+
+            if (propertySymbol.GetMethod != null)
+            {
+                getterDelegateType = $"global::System.Func<{propertyType}>";
+                getterName = $"Get{propertyName}";
+                getterParameterName = $"get{propertyName}";
+                getterFieldName = $"_{getterParameterName}";
+
+                implementationLines.Add($"    get => {getterFieldName}();");
+            }
+            else
+            {
+                getterDelegateType = null;
+                getterName = null;
+                getterParameterName = null;
+                getterFieldName = null;
+            }
+
+            if (propertySymbol.SetMethod != null)
+            {
+                setterDelegateType = $"global::System.Action<{propertyType}>";
+                setterName = $"Set{propertyName}";
+                setterParameterName = $"set{propertyName}";
+                setterFieldName = $"_{setterParameterName}";
+
+                implementationLines.Add($"    set => {setterFieldName}(value);");
+            }
+            else
+            {
+                setterDelegateType = null;
+                setterName = null;
+                setterParameterName = null;
+                setterFieldName = null;
+            }
+
+            implementationLines.Add($"}}");
+
+            builder.Add(new PropertyContext(
+                Type: propertyType,
+                GetterDelegateType: getterDelegateType,
+                SetterDelegateType: setterDelegateType,
+                Name: propertyName,
+                GetterName: getterName,
+                SetterName: setterName,
+                GetterParameterName: getterParameterName,
+                SetterParameterName: setterParameterName,
+                GetterFieldName: getterFieldName,
+                SetterFieldName: setterFieldName,
+                Implementation: implementationLines.ToImmutable()
+            ));
+        }
+
+        return builder.ToImmutable();
+    }
 
     public static ImmutableArray<MethodContext> CreateMethodContexts(ImmutableArray<IMethodSymbol> methodSymbols)
     {
