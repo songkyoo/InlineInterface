@@ -165,7 +165,12 @@ internal static class SourceGenerationHelpers
         // builder constructor parameters
         stringBuilder.Append($"{depthSpacerText}public {mergedTypePrefix}Builder(");
         stringBuilder.AppendLine();
-        stringBuilder.Append($"{depthSpacerText}{Indent}{type}? @base,");
+        stringBuilder.Append($"{depthSpacerText}{Indent}{type}? @base");
+
+        if (methodContexts.Length > 0)
+        {
+            stringBuilder.Append(",");
+        }
 
         for (var i = 0; i < methodContexts.Length; i++)
         {
