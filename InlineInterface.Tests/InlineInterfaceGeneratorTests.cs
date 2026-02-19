@@ -231,11 +231,13 @@ public class InlineInterfaceGeneratorTests
 
                         if (_base != null)
                         {
-                            getFirstName = () => _base.FirstName;
-                            setFirstName = value => _base.FirstName = value;
-                            getLastName = () => _base.LastName;
-                            getName_0 = _base.GetName;
-                            setName_0 = _base.SetName;
+                            var @base = _base;
+
+                            getFirstName = () => @base.FirstName;
+                            setFirstName = value => @base.FirstName = value;
+                            getLastName = () => @base.LastName;
+                            getName_0 = @base.GetName;
+                            setName_0 = @base.SetName;
                         }
 
                         return new Impl(

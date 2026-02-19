@@ -437,6 +437,8 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
             stringBuilder.AppendLine($"{depthSpacerText}if (_base != null)");
             stringBuilder.AppendLine($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}var @base = _base;");
+            stringBuilder.AppendLine();
 
             foreach (var propertyContext in propertyContexts)
             {
@@ -445,7 +447,7 @@ internal static class SourceGenerationHelpers
                     GetterParameterName: { } getterParameterName,
                 })
                 {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = () => _base.{propertyContext.Name};");
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = () => @base.{propertyContext.Name};");
                 }
 
                 if (propertyContext is
@@ -453,13 +455,13 @@ internal static class SourceGenerationHelpers
                     SetterParameterName: { } setterParameterName,
                 })
                 {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = value => _base.{propertyContext.Name} = value;");
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = value => @base.{propertyContext.Name} = value;");
                 }
             }
 
             foreach (var methodContext in methodContexts)
             {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = _base.{methodContext.Name};");
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = @base.{methodContext.Name};");
             }
 
             stringBuilder.AppendLine($"{depthSpacerText}}}");
