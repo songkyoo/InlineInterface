@@ -57,6 +57,13 @@ internal static class SourceGenerationHelpers
 
         // begin builder type
         stringBuilder.AppendLine($"{depthSpacerText}internal readonly struct {typeBuilder}");
+
+        // constraints
+        foreach (var constraint in genericParameterConstraints)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
+        }
+
         stringBuilder.AppendLine($"{depthSpacerText}{{");
 
         depthSpacerText += Indent;
