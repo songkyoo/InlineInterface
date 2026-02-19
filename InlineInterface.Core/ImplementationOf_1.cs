@@ -4,5 +4,11 @@ public readonly struct ImplementationOf<T>
 {
     public T? Base { get; }
 
-    internal ImplementationOf(T? @base) => Base = @base;
+    public bool AllowMissingImplementation { get; }
+
+    internal ImplementationOf(T? @base, bool allowMissingImplementation)
+    {
+        Base = @base;
+        AllowMissingImplementation = allowMissingImplementation;
+    }
 }

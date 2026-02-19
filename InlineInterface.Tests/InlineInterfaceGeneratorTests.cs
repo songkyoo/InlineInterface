@@ -147,18 +147,18 @@ public class InlineInterfaceGeneratorTests
                 {
                     private sealed class Impl : global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>
                     {
-                        private readonly global::System.Func<string?> _getFirstName;
-                        private readonly global::System.Action<string?> _setFirstName;
-                        private readonly global::System.Func<string> _getLastName;
-                        private readonly global::System.Func<string> _getName_0;
-                        private readonly global::System.Action<string> _setName_0;
+                        private readonly global::System.Func<string?>? _getFirstName;
+                        private readonly global::System.Action<string?>? _setFirstName;
+                        private readonly global::System.Func<string>? _getLastName;
+                        private readonly global::System.Func<string>? _getName_0;
+                        private readonly global::System.Action<string>? _setName_0;
 
                         public Impl(
-                            global::System.Func<string?> getFirstName,
-                            global::System.Action<string?> setFirstName,
-                            global::System.Func<string> getLastName,
-                            global::System.Func<string> getName_0,
-                            global::System.Action<string> setName_0)
+                            global::System.Func<string?>? getFirstName,
+                            global::System.Action<string?>? setFirstName,
+                            global::System.Func<string>? getLastName,
+                            global::System.Func<string>? getName_0,
+                            global::System.Action<string>? setName_0)
                         {
                             _getFirstName = getFirstName;
                             _setFirstName = setFirstName;
@@ -171,21 +171,22 @@ public class InlineInterfaceGeneratorTests
 
                         public string? FirstName
                         {
-                            get => _getFirstName();
-                            set => _setFirstName(value);
+                            get => (_getFirstName ?? throw new global::System.NotImplementedException())();
+                            set => (_setFirstName ?? throw new global::System.NotImplementedException())(value);
                         }
 
                         public string LastName
                         {
-                            get => _getLastName();
+                            get => (_getLastName ?? throw new global::System.NotImplementedException())();
                         }
 
-                        public string GetName() => _getName_0();
+                        public string GetName() => (_getName_0 ?? throw new global::System.NotImplementedException())();
 
-                        public void SetName(string name) => _setName_0(name);
+                        public void SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(name);
                     }
 
                     private readonly global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>? _base;
+                    private readonly bool _allowMissingImplementation;
 
                     private readonly global::System.Func<string?>? GetFirstName { get; init; } = null;
 
@@ -199,6 +200,7 @@ public class InlineInterfaceGeneratorTests
 
                     public Parent_1_IPerson_1Builder(
                         global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>? @base,
+                        bool allowMissingImplementation,
                         global::System.Func<string?>? getFirstName = null,
                         global::System.Action<string?>? setFirstName = null,
                         global::System.Func<string>? getLastName = null,
@@ -206,6 +208,8 @@ public class InlineInterfaceGeneratorTests
                         global::System.Action<string>? setName_0 = null)
                     {
                         _base = @base;
+                        _allowMissingImplementation = allowMissingImplementation;
+
                         GetFirstName = getFirstName;
                         SetFirstName = setFirstName;
                         GetLastName = getLastName;
@@ -241,11 +245,11 @@ public class InlineInterfaceGeneratorTests
                         }
 
                         return new Impl(
-                            getFirstName: GetFirstName ?? getFirstName ?? throw new global::System.InvalidOperationException(),
-                            setFirstName: SetFirstName ?? setFirstName ?? throw new global::System.InvalidOperationException(),
-                            getLastName: GetLastName ?? getLastName ?? throw new global::System.InvalidOperationException(),
-                            getName_0: GetName_0 ?? getName_0 ?? throw new global::System.InvalidOperationException(),
-                            setName_0: SetName_0 ?? setName_0 ?? throw new global::System.InvalidOperationException());
+                            getFirstName: GetFirstName ?? getFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            setFirstName: SetFirstName ?? setFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            getLastName: GetLastName ?? getLastName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            getName_0: GetName_0 ?? getName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            setName_0: SetName_0 ?? setName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
                     }
                 }
             }
@@ -261,7 +265,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, getFirstName: getter, setFirstName: setter);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, getFirstName: getter, setFirstName: setter);
                     }
 
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> LastName<T0, T1>(
@@ -270,7 +274,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, getLastName: getter);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, getLastName: getter);
                     }
 
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> GetName<T0, T1>(
@@ -279,7 +283,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, getName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, getName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> SetName<T0, T1>(
@@ -288,7 +292,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, setName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, setName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build<T0, T1>(
@@ -297,7 +301,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base).Build(_);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation).Build(_);
                     }
                 }
             }

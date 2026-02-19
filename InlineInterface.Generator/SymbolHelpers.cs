@@ -66,7 +66,7 @@ internal static class SymbolHelpers
                 getterParameterName = $"get{propertyName}";
                 getterFieldName = $"_{getterParameterName}";
 
-                implementationLines.Add($"    get => {getterFieldName}();");
+                implementationLines.Add($"    get => ({getterFieldName} ?? throw new global::System.NotImplementedException())();");
             }
             else
             {
@@ -83,7 +83,7 @@ internal static class SymbolHelpers
                 setterParameterName = $"set{propertyName}";
                 setterFieldName = $"_{setterParameterName}";
 
-                implementationLines.Add($"    set => {setterFieldName}(value);");
+                implementationLines.Add($"    set => ({setterFieldName} ?? throw new global::System.NotImplementedException())(value);");
             }
             else
             {
@@ -173,7 +173,7 @@ internal static class SymbolHelpers
                 UniqueName: uniqueName,
                 ParameterName: parameterName,
                 FieldName: fieldName,
-                Implementation: $"public {returnType} {methodName}({paramList}) => {fieldName}({argList});"
+                Implementation: $"public {returnType} {methodName}({paramList}) => ({fieldName} ?? throw new global::System.NotImplementedException())({argList});"
             ));
         }
 
