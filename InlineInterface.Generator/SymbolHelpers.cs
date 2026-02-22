@@ -33,7 +33,9 @@ internal static class SymbolHelpers
     );
 
     public static ImmutableArray<PropertyContext> CreatePropertyContexts(
-        ImmutableArray<IPropertySymbol> propertySymbols
+        ImmutableArray<IPropertySymbol> propertySymbols,
+        string indent,
+        bool hasEventMembers
     )
     {
         var builder = ImmutableArray.CreateBuilder<PropertyContext>();
@@ -59,14 +61,16 @@ internal static class SymbolHelpers
             implementationLines.Add($"public {propertyType} {propertyName}");
             implementationLines.Add($"{{");
 
+            var eventRaiserTypeParam = hasEventMembers ? "EventRaiser, " : "";
+
             if (propertySymbol.GetMethod != null)
             {
-                getterDelegateType = $"global::System.Func<{propertyType}>";
+                getterDelegateType = $"global::System.Func<{eventRaiserTypeParam}{propertyType}>";
                 getterName = $"Get{propertyName}";
                 getterParameterName = $"get{propertyName}";
                 getterFieldName = $"_{getterParameterName}";
 
-                implementationLines.Add($"    get => ({getterFieldName} ?? throw new global::System.NotImplementedException())();");
+                implementationLines.Add($"{indent}get => ({getterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventRaiser" : "")});");
             }
             else
             {
@@ -78,12 +82,12 @@ internal static class SymbolHelpers
 
             if (propertySymbol.SetMethod != null)
             {
-                setterDelegateType = $"global::System.Action<{propertyType}>";
+                setterDelegateType = $"global::System.Action<{eventRaiserTypeParam}{propertyType}>";
                 setterName = $"Set{propertyName}";
                 setterParameterName = $"set{propertyName}";
                 setterFieldName = $"_{setterParameterName}";
 
-                implementationLines.Add($"    set => ({setterFieldName} ?? throw new global::System.NotImplementedException())(value);");
+                implementationLines.Add($"{indent}set => ({setterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventRaiser, " : "")}value);");
             }
             else
             {
@@ -113,7 +117,10 @@ internal static class SymbolHelpers
         return builder.ToImmutable();
     }
 
-    public static ImmutableArray<MethodContext> CreateMethodContexts(ImmutableArray<IMethodSymbol> methodSymbols)
+    public static ImmutableArray<MethodContext> CreateMethodContexts(
+        ImmutableArray<IMethodSymbol> methodSymbols,
+        bool hasEventMembers
+    )
     {
         var methodNameCounter = new Dictionary<string, int>();
         var builder = ImmutableArray.CreateBuilder<MethodContext>();
@@ -132,6 +139,12 @@ internal static class SymbolHelpers
             var paramTypes = new List<string>();
             var parameters = new List<string>();
             var arguments = new List<string>();
+
+            if (hasEventMembers)
+            {
+                paramTypes.Add("EventRaiser");
+                arguments.Add("_eventRaiser");
+            }
 
             foreach (var paramSymbol in methodSymbol.Parameters)
             {

@@ -27,8 +27,9 @@ internal static class SourceGenerationHelpers
             genericParameters,
             genericParameterConstraints
         ) = GetTypeStrings(typeSymbol);
-        var propertyContexts = CreatePropertyContexts(propertySymbols);
-        var methodContexts = CreateMethodContexts(methodSymbols);
+        var hasEventMembers = eventSymbols.Length > 0;
+        var propertyContexts = CreatePropertyContexts(propertySymbols, Indent, hasEventMembers);
+        var methodContexts = CreateMethodContexts(methodSymbols, hasEventMembers);
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
@@ -68,11 +69,47 @@ internal static class SourceGenerationHelpers
 
         depthSpacerText += Indent;
 
+        if (hasEventMembers)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}public sealed class EventRaiser");
+            stringBuilder.Append($"{depthSpacerText}{{");
+
+            depthSpacerText += Indent;
+
+            foreach (var eventSymbol in eventSymbols)
+            {
+                stringBuilder.AppendLine();
+
+                var eventType = eventSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+                    IncludeNullableReferenceTypeModifier |
+                    UseSpecialTypes
+                ));
+
+                if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+                {
+                    eventType += "?";
+                }
+
+                stringBuilder.Append($"{depthSpacerText}public {eventType} {eventSymbol.Name} {{ get; init; }}");
+            }
+
+            depthSpacerText = depthSpacerText[..^Indent.Length];
+
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
+            stringBuilder.AppendLine();
+        }
+
         // begin impl type
         stringBuilder.AppendLine($"{depthSpacerText}private sealed class Impl : {type}");
         stringBuilder.AppendLine($"{depthSpacerText}{{");
 
         depthSpacerText += Indent;
+
+        if (hasEventMembers)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly EventRaiser _eventRaiser;");
+        }
 
         foreach (var propertyContext in propertyContexts)
         {
@@ -147,6 +184,23 @@ internal static class SourceGenerationHelpers
         // begin impl constructor body
         depthSpacerText += Indent;
 
+        if (hasEventMembers)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}_eventRaiser = new EventRaiser");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+            depthSpacerText += Indent;
+
+            foreach (var eventSymbol in eventSymbols)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{eventSymbol.Name} = {eventSymbol.Name},");
+            }
+
+            depthSpacerText = depthSpacerText[..^Indent.Length];
+
+            stringBuilder.AppendLine($"{depthSpacerText}}};");
+        }
+
         foreach (var propertyContext in propertyContexts)
         {
             if (propertyContext is
@@ -179,14 +233,10 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // impl event implementations
-        if (eventSymbols.Length > 0)
+        foreach (var eventSymbol in eventSymbols)
         {
             stringBuilder.AppendLine();
-        }
 
-        for (var i = 0; i < eventSymbols.Length; i++)
-        {
-            var eventSymbol = eventSymbols[i];
             var eventType = eventSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
                 IncludeNullableReferenceTypeModifier |
                 UseSpecialTypes
@@ -197,51 +247,29 @@ internal static class SourceGenerationHelpers
                 eventType += "?";
             }
 
-            stringBuilder.AppendLine($"{depthSpacerText}public event {eventType} {eventSymbol.Name};");
-
-            if (i < eventSymbols.Length - 1)
-            {
-                stringBuilder.AppendLine();
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}public event {eventType} {eventSymbol.Name}");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}add => _eventRaiser.{eventSymbol.Name} += value;");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}remove => _eventRaiser.{eventSymbol.Name} -= value;");
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
         }
 
         // impl property implementations
-        if (propertyContexts.Length > 0)
+        foreach (var propertyContext in propertyContexts)
         {
             stringBuilder.AppendLine();
-        }
-
-        for (var i = 0; i < propertyContexts.Length; i++)
-        {
-            var propertyContext = propertyContexts[i];
 
             foreach (var line in propertyContext.Implementation)
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.AppendLine();
-            }
         }
 
         // impl method implementations
-        if (methodContexts.Length > 0)
+        foreach (var methodContext in methodContexts)
         {
             stringBuilder.AppendLine();
-        }
-
-        for (var i = 0; i < methodContexts.Length; i++)
-        {
-            var methodContext = methodContexts[i];
-
             stringBuilder.AppendLine($"{depthSpacerText}{methodContext.Implementation}");
-
-            if (i < methodContexts.Length - 1)
-            {
-                stringBuilder.AppendLine();
-            }
         }
 
         // end impl type
@@ -459,7 +487,7 @@ internal static class SourceGenerationHelpers
                     SetterParameterName: { } setterParameterName,
                 })
                 {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName} ?? (value => @base.{propertyContext.Name} = value);");
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName} ?? ((value) => @base.{propertyContext.Name} = value);");
                 }
             }
 
