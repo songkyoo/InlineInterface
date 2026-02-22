@@ -237,19 +237,27 @@ public class InlineInterfaceGeneratorTests
                         {
                             var @base = _base;
 
-                            getFirstName = () => @base.FirstName;
-                            setFirstName = value => @base.FirstName = value;
-                            getLastName = () => @base.LastName;
-                            getName_0 = @base.GetName;
-                            setName_0 = @base.SetName;
+                            getFirstName = GetFirstName ?? (() => @base.FirstName);
+                            setFirstName = SetFirstName ?? (value => @base.FirstName = value);
+                            getLastName = GetLastName ?? (() => @base.LastName);
+                            getName_0 = GetName_0 ?? @base.GetName;
+                            setName_0 = SetName_0 ?? @base.SetName;
+                        }
+                        else
+                        {
+                            getFirstName = GetFirstName;
+                            setFirstName = SetFirstName;
+                            getLastName = GetLastName;
+                            getName_0 = GetName_0;
+                            setName_0 = SetName_0;
                         }
 
                         return new Impl(
-                            getFirstName: GetFirstName ?? getFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            setFirstName: SetFirstName ?? setFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            getLastName: GetLastName ?? getLastName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            getName_0: GetName_0 ?? getName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            setName_0: SetName_0 ?? setName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
+                            getFirstName: getFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            setFirstName: setFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            getLastName: getLastName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            getName_0: getName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            setName_0: setName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
                     }
                 }
             }

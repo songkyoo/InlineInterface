@@ -451,7 +451,7 @@ internal static class SourceGenerationHelpers
                     GetterParameterName: { } getterParameterName,
                 })
                 {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = () => @base.{propertyContext.Name};");
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = {propertyContext.GetterName} ?? (() => @base.{propertyContext.Name});");
                 }
 
                 if (propertyContext is
@@ -459,13 +459,41 @@ internal static class SourceGenerationHelpers
                     SetterParameterName: { } setterParameterName,
                 })
                 {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = value => @base.{propertyContext.Name} = value;");
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName} ?? (value => @base.{propertyContext.Name} = value);");
                 }
             }
 
             foreach (var methodContext in methodContexts)
             {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = @base.{methodContext.Name};");
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = {methodContext.UniqueName} ?? @base.{methodContext.Name};");
+            }
+
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
+            stringBuilder.AppendLine($"{depthSpacerText}else");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+            foreach (var propertyContext in propertyContexts)
+            {
+                if (propertyContext is
+                    {
+                        GetterParameterName: { } getterParameterName,
+                    })
+                {
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = {propertyContext.GetterName};");
+                }
+
+                if (propertyContext is
+                    {
+                        SetterParameterName: { } setterParameterName,
+                    })
+                {
+                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName};");
+                }
+            }
+
+            foreach (var methodContext in methodContexts)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = {methodContext.UniqueName};");
             }
 
             stringBuilder.AppendLine($"{depthSpacerText}}}");
@@ -480,26 +508,24 @@ internal static class SourceGenerationHelpers
         {
             if (propertyContext is
             {
-                GetterName: { } getterName,
                 GetterParameterName: { } getterParameterName,
             })
             {
-                implConstructorArgs.Add($"{getterParameterName}: {getterName} ?? {getterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+                implConstructorArgs.Add($"{getterParameterName}: {getterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
             }
 
             if (propertyContext is
             {
-                SetterName: { } setterName,
                 SetterParameterName: { } setterParameterName,
             })
             {
-                implConstructorArgs.Add($"{setterParameterName}: {setterName} ?? {setterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+                implConstructorArgs.Add($"{setterParameterName}: {setterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
             }
         }
 
         foreach (var methodContext in methodContexts)
         {
-            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.UniqueName} ?? {methodContext.ParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.ParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
         }
 
         if (implConstructorArgs.Count > 0)
