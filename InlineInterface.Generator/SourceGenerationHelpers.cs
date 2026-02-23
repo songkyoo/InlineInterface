@@ -71,7 +71,7 @@ internal static class SourceGenerationHelpers
 
         if (hasEventMembers)
         {
-            stringBuilder.AppendLine($"{depthSpacerText}public sealed class EventRaiser");
+            stringBuilder.AppendLine($"{depthSpacerText}public sealed class EventCollection");
             stringBuilder.Append($"{depthSpacerText}{{");
 
             depthSpacerText += Indent;
@@ -90,7 +90,7 @@ internal static class SourceGenerationHelpers
                     eventType += "?";
                 }
 
-                stringBuilder.Append($"{depthSpacerText}public {eventType} {eventSymbol.Name} {{ get; init; }}");
+                stringBuilder.Append($"{depthSpacerText}public {eventType} {eventSymbol.Name};");
             }
 
             depthSpacerText = depthSpacerText[..^Indent.Length];
@@ -108,7 +108,7 @@ internal static class SourceGenerationHelpers
 
         if (hasEventMembers)
         {
-            stringBuilder.AppendLine($"{depthSpacerText}private readonly EventRaiser _eventRaiser;");
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly EventCollection _eventCollection = new();");
         }
 
         foreach (var propertyContext in propertyContexts)
@@ -184,23 +184,6 @@ internal static class SourceGenerationHelpers
         // begin impl constructor body
         depthSpacerText += Indent;
 
-        if (hasEventMembers)
-        {
-            stringBuilder.AppendLine($"{depthSpacerText}_eventRaiser = new EventRaiser");
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-
-            depthSpacerText += Indent;
-
-            foreach (var eventSymbol in eventSymbols)
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{eventSymbol.Name} = {eventSymbol.Name},");
-            }
-
-            depthSpacerText = depthSpacerText[..^Indent.Length];
-
-            stringBuilder.AppendLine($"{depthSpacerText}}};");
-        }
-
         foreach (var propertyContext in propertyContexts)
         {
             if (propertyContext is
@@ -249,8 +232,8 @@ internal static class SourceGenerationHelpers
 
             stringBuilder.AppendLine($"{depthSpacerText}public event {eventType} {eventSymbol.Name}");
             stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}add => _eventRaiser.{eventSymbol.Name} += value;");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}remove => _eventRaiser.{eventSymbol.Name} -= value;");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}add => _eventCollection.{eventSymbol.Name} += value;");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}remove => _eventCollection.{eventSymbol.Name} -= value;");
             stringBuilder.AppendLine($"{depthSpacerText}}}");
         }
 
@@ -517,7 +500,7 @@ internal static class SourceGenerationHelpers
                 GetterParameterName: { } getterParameterName,
             })
             {
-                parameters.Add($"{getterDelegateType} getter");
+                parameters.Add($"{(hasEventMembers ? getterDelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : getterDelegateType)} getter");
                 expressions.Add($"{getterParameterName}: getter");
             }
 
@@ -527,7 +510,7 @@ internal static class SourceGenerationHelpers
                 SetterParameterName: { } setterParameterName,
             })
             {
-                parameters.Add($"{setterDelegateType} setter");
+                parameters.Add($"{(hasEventMembers ? setterDelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : setterDelegateType)} setter");
                 expressions.Add($"{setterParameterName}: setter");
             }
 
@@ -552,7 +535,7 @@ internal static class SourceGenerationHelpers
         {
             stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.DelegateType} impl)");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{(hasEventMembers ? methodContext.DelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : methodContext.DelegateType)} impl)");
 
             // constraints
             foreach (var constraint in genericParameterConstraints)

@@ -61,16 +61,16 @@ internal static class SymbolHelpers
             implementationLines.Add($"public {propertyType} {propertyName}");
             implementationLines.Add($"{{");
 
-            var eventRaiserTypeParam = hasEventMembers ? "EventRaiser, " : "";
+            var eventCollectionTypeParam = hasEventMembers ? "EventCollection, " : "";
 
             if (propertySymbol.GetMethod != null)
             {
-                getterDelegateType = $"global::System.Func<{eventRaiserTypeParam}{propertyType}>";
+                getterDelegateType = $"global::System.Func<{eventCollectionTypeParam}{propertyType}>";
                 getterName = $"Get{propertyName}";
                 getterParameterName = $"get{propertyName}";
                 getterFieldName = $"_{getterParameterName}";
 
-                implementationLines.Add($"{indent}get => ({getterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventRaiser" : "")});");
+                implementationLines.Add($"{indent}get => ({getterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventCollection" : "")});");
             }
             else
             {
@@ -82,12 +82,12 @@ internal static class SymbolHelpers
 
             if (propertySymbol.SetMethod != null)
             {
-                setterDelegateType = $"global::System.Action<{eventRaiserTypeParam}{propertyType}>";
+                setterDelegateType = $"global::System.Action<{eventCollectionTypeParam}{propertyType}>";
                 setterName = $"Set{propertyName}";
                 setterParameterName = $"set{propertyName}";
                 setterFieldName = $"_{setterParameterName}";
 
-                implementationLines.Add($"{indent}set => ({setterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventRaiser, " : "")}value);");
+                implementationLines.Add($"{indent}set => ({setterFieldName} ?? throw new global::System.NotImplementedException())({(hasEventMembers ? "_eventCollection, " : "")}value);");
             }
             else
             {
@@ -142,8 +142,8 @@ internal static class SymbolHelpers
 
             if (hasEventMembers)
             {
-                paramTypes.Add("EventRaiser");
-                arguments.Add("_eventRaiser");
+                paramTypes.Add("EventCollection");
+                arguments.Add("_eventCollection");
             }
 
             foreach (var paramSymbol in methodSymbol.Parameters)

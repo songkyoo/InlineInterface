@@ -287,7 +287,7 @@ public class InlineInterfaceGeneratorTests
     }
 
     [Test]
-    public void When_InterfaceHasEventMember_Should_GenerateEventRaiser()
+    public void When_InterfaceHasEventMember_Should_GenerateEventCollection()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -327,54 +327,49 @@ public class InlineInterfaceGeneratorTests
             {
                 internal readonly struct Parent_1_IPerson_1Builder<T0, T1>
                 {
-                    public sealed class EventRaiser
+                    public sealed class EventCollection
                     {
-                        public global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? NameChanged { get; init; }
+                        public global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? NameChanged;
                     }
 
                     private sealed class Impl : global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>
                     {
-                        private readonly EventRaiser _eventRaiser;
-                        private readonly global::System.Func<EventRaiser, string>? _getLastName;
-                        private readonly global::System.Action<EventRaiser, string>? _setName_0;
+                        private readonly EventCollection _eventCollection = new();
+                        private readonly global::System.Func<EventCollection, string>? _getLastName;
+                        private readonly global::System.Action<EventCollection, string>? _setName_0;
 
                         public Impl(
-                            global::System.Func<EventRaiser, string>? getLastName,
-                            global::System.Action<EventRaiser, string>? setName_0)
+                            global::System.Func<EventCollection, string>? getLastName,
+                            global::System.Action<EventCollection, string>? setName_0)
                         {
-                            _eventRaiser = new EventRaiser
-                            {
-                                NameChanged = NameChanged,
-                            };
                             _getLastName = getLastName;
                             _setName_0 = setName_0;
                         }
 
                         public event global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? NameChanged
                         {
-                            add => _eventRaiser.NameChanged += value;
-                            remove => _eventRaiser.NameChanged -= value;
+                            add => _eventCollection.NameChanged += value;
+                            remove => _eventCollection.NameChanged -= value;
                         }
 
                         public string LastName
                         {
-                            get => (_getLastName ?? throw new global::System.NotImplementedException())(_eventRaiser);
+                            get => (_getLastName ?? throw new global::System.NotImplementedException())(_eventCollection);
                         }
 
-                        public void SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(_eventRaiser, name);
+                        public void SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(_eventCollection, name);
                     }
 
-                    private readonly global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>? _base;
                     private readonly bool _allowMissingImplementation;
 
-                    private readonly global::System.Func<EventRaiser, string>? GetLastName { get; init; } = null;
+                    private readonly global::System.Func<EventCollection, string>? GetLastName { get; init; } = null;
 
-                    private readonly global::System.Action<EventRaiser, string>? SetName_0 { get; init; } = null;
+                    private readonly global::System.Action<EventCollection, string>? SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
                         bool allowMissingImplementation,
-                        global::System.Func<EventRaiser, string>? getLastName = null,
-                        global::System.Action<EventRaiser, string>? setName_0 = null)
+                        global::System.Func<EventCollection, string>? getLastName = null,
+                        global::System.Action<EventCollection, string>? setName_0 = null)
                     {
                         _allowMissingImplementation = allowMissingImplementation;
 
@@ -382,9 +377,9 @@ public class InlineInterfaceGeneratorTests
                         SetName_0 = setName_0;
                     }
 
-                    public Parent_1_IPerson_1Builder<T0, T1> LastName(global::System.Func<EventRaiser, string> getter) => this with { GetLastName = getter };
+                    public Parent_1_IPerson_1Builder<T0, T1> LastName(global::System.Func<EventCollection, string> getter) => this with { GetLastName = getter };
 
-                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<EventRaiser, string> impl) => this with { SetName_0 = impl };
+                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<EventCollection, string> impl) => this with { SetName_0 = impl };
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
@@ -401,7 +396,7 @@ public class InlineInterfaceGeneratorTests
                 {
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> LastName<T0, T1>(
                         this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
-                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventRaiser, string> getter)
+                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventCollection, string> getter)
                     {
                         return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, getLastName: getter);
                     }
