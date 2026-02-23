@@ -279,7 +279,6 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
 
         // builder field members
-        stringBuilder.AppendLine($"{depthSpacerText}private readonly {type}? _base;");
         stringBuilder.AppendLine($"{depthSpacerText}private readonly bool _allowMissingImplementation;");
         stringBuilder.AppendLine();
 
@@ -315,7 +314,6 @@ internal static class SourceGenerationHelpers
         // builder constructor parameters
         stringBuilder.Append($"{depthSpacerText}public {mergedTypePrefix}Builder(");
         stringBuilder.AppendLine();
-        stringBuilder.AppendLine($"{depthSpacerText}{Indent}{type}? @base,");
         stringBuilder.Append($"{depthSpacerText}{Indent}bool allowMissingImplementation");
 
         var builderConstructorParams = new List<string>();
@@ -360,7 +358,6 @@ internal static class SourceGenerationHelpers
         // begin builder constructor body
         depthSpacerText += Indent;
 
-        stringBuilder.AppendLine($"{depthSpacerText}_base = @base;");
         stringBuilder.AppendLine($"{depthSpacerText}_allowMissingImplementation = allowMissingImplementation;");
         stringBuilder.AppendLine();
 
@@ -438,96 +435,6 @@ internal static class SourceGenerationHelpers
 
         depthSpacerText += Indent;
 
-        foreach (var propertyContext in propertyContexts)
-        {
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{getterDelegateType}? {getterParameterName} = null;");
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{setterDelegateType}? {setterParameterName} = null;");
-            }
-        }
-
-        foreach (var methodContext in methodContexts)
-        {
-            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.DelegateType}? {methodContext.ParameterName} = null;");
-        }
-
-        if (propertyContexts.Length + methodContexts.Length > 0)
-        {
-            stringBuilder.AppendLine();
-            stringBuilder.AppendLine($"{depthSpacerText}if (_base != null)");
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}var @base = _base;");
-            stringBuilder.AppendLine();
-
-            foreach (var propertyContext in propertyContexts)
-            {
-                if (propertyContext is
-                {
-                    GetterParameterName: { } getterParameterName,
-                })
-                {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = {propertyContext.GetterName} ?? (() => @base.{propertyContext.Name});");
-                }
-
-                if (propertyContext is
-                {
-                    SetterParameterName: { } setterParameterName,
-                })
-                {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName} ?? ((value) => @base.{propertyContext.Name} = value);");
-                }
-            }
-
-            foreach (var methodContext in methodContexts)
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = {methodContext.UniqueName} ?? @base.{methodContext.Name};");
-            }
-
-            stringBuilder.AppendLine($"{depthSpacerText}}}");
-            stringBuilder.AppendLine($"{depthSpacerText}else");
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-
-            foreach (var propertyContext in propertyContexts)
-            {
-                if (propertyContext is
-                    {
-                        GetterParameterName: { } getterParameterName,
-                    })
-                {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{getterParameterName} = {propertyContext.GetterName};");
-                }
-
-                if (propertyContext is
-                    {
-                        SetterParameterName: { } setterParameterName,
-                    })
-                {
-                    stringBuilder.AppendLine($"{depthSpacerText}{Indent}{setterParameterName} = {propertyContext.SetterName};");
-                }
-            }
-
-            foreach (var methodContext in methodContexts)
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.ParameterName} = {methodContext.UniqueName};");
-            }
-
-            stringBuilder.AppendLine($"{depthSpacerText}}}");
-            stringBuilder.AppendLine();
-        }
-
         stringBuilder.Append($"{depthSpacerText}return new Impl(");
 
         var implConstructorArgs = new List<string>();
@@ -536,24 +443,26 @@ internal static class SourceGenerationHelpers
         {
             if (propertyContext is
             {
+                GetterName: { } getterName,
                 GetterParameterName: { } getterParameterName,
             })
             {
-                implConstructorArgs.Add($"{getterParameterName}: {getterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+                implConstructorArgs.Add($"{getterParameterName}: {getterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
             }
 
             if (propertyContext is
             {
+                SetterName: { } setterName,
                 SetterParameterName: { } setterParameterName,
             })
             {
-                implConstructorArgs.Add($"{setterParameterName}: {setterParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+                implConstructorArgs.Add($"{setterParameterName}: {setterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
             }
         }
 
         foreach (var methodContext in methodContexts)
         {
-            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.ParameterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
+            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.UniqueName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
         }
 
         if (implConstructorArgs.Count > 0)
@@ -634,7 +543,7 @@ internal static class SourceGenerationHelpers
 
             // method body
             stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, {string.Join(", ", expressions)});");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(allowMissingImplementation: implementationOf.AllowMissingImplementation, {string.Join(", ", expressions)});");
             stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
@@ -653,7 +562,7 @@ internal static class SourceGenerationHelpers
 
             // method body
             stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation, {methodContext.ParameterName}: impl);");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(allowMissingImplementation: implementationOf.AllowMissingImplementation, {methodContext.ParameterName}: impl);");
             stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
@@ -669,7 +578,7 @@ internal static class SourceGenerationHelpers
         }
 
         stringBuilder.AppendLine($"{depthSpacerText}{{");
-        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(@base: implementationOf.Base, allowMissingImplementation: implementationOf.AllowMissingImplementation).Build(_);");
+        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(allowMissingImplementation: implementationOf.AllowMissingImplementation).Build(_);");
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // end extension class
