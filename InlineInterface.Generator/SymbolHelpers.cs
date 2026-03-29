@@ -33,6 +33,7 @@ internal static class SymbolHelpers
     );
 
     public static ImmutableArray<PropertyContext> CreatePropertyContexts(
+        string interfaceType,
         ImmutableArray<IPropertySymbol> propertySymbols,
         string indent,
         bool hasEventMembers
@@ -58,7 +59,7 @@ internal static class SymbolHelpers
             string? setterFieldName;
             var implementationLines = ImmutableArray.CreateBuilder<string>();
 
-            implementationLines.Add($"public {propertyType} {propertyName}");
+            implementationLines.Add($"{propertyType} {interfaceType}.{propertyName}");
             implementationLines.Add($"{{");
 
             var eventCollectionTypeParam = hasEventMembers ? "EventCollection, " : "";
@@ -118,6 +119,7 @@ internal static class SymbolHelpers
     }
 
     public static ImmutableArray<MethodContext> CreateMethodContexts(
+        string interfaceType,
         ImmutableArray<IMethodSymbol> methodSymbols,
         bool hasEventMembers
     )
@@ -186,7 +188,7 @@ internal static class SymbolHelpers
                 UniqueName: uniqueName,
                 ParameterName: parameterName,
                 FieldName: fieldName,
-                Implementation: $"public {returnType} {methodName}({paramList}) => ({fieldName} ?? throw new global::System.NotImplementedException())({argList});"
+                Implementation: $"{returnType} {interfaceType}.{methodName}({paramList}) => ({fieldName} ?? throw new global::System.NotImplementedException())({argList});"
             ));
         }
 

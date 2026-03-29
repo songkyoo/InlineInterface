@@ -28,8 +28,8 @@ internal static class SourceGenerationHelpers
             genericParameterConstraints
         ) = GetTypeStrings(typeSymbol);
         var hasEventMembers = eventSymbols.Length > 0;
-        var propertyContexts = CreatePropertyContexts(propertySymbols, Indent, hasEventMembers);
-        var methodContexts = CreateMethodContexts(methodSymbols, hasEventMembers);
+        var propertyContexts = CreatePropertyContexts(type, propertySymbols, Indent, hasEventMembers);
+        var methodContexts = CreateMethodContexts(type, methodSymbols, hasEventMembers);
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
@@ -230,7 +230,7 @@ internal static class SourceGenerationHelpers
                 eventType += "?";
             }
 
-            stringBuilder.AppendLine($"{depthSpacerText}public event {eventType} {eventSymbol.Name}");
+            stringBuilder.AppendLine($"{depthSpacerText}event {eventType} {type}.{eventSymbol.Name}");
             stringBuilder.AppendLine($"{depthSpacerText}{{");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}add => _eventCollection.{eventSymbol.Name} += value;");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}remove => _eventCollection.{eventSymbol.Name} -= value;");

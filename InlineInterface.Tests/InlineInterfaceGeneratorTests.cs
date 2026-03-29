@@ -165,20 +165,20 @@ public class InlineInterfaceGeneratorTests
                             _setName_0 = setName_0;
                         }
 
-                        public string? FirstName
+                        string? global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.FirstName
                         {
                             get => (_getFirstName ?? throw new global::System.NotImplementedException())();
                             set => (_setFirstName ?? throw new global::System.NotImplementedException())(value);
                         }
 
-                        public string LastName
+                        string global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.LastName
                         {
                             get => (_getLastName ?? throw new global::System.NotImplementedException())();
                         }
 
-                        public string GetName() => (_getName_0 ?? throw new global::System.NotImplementedException())();
+                        string global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.GetName() => (_getName_0 ?? throw new global::System.NotImplementedException())();
 
-                        public void SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(name);
+                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(name);
                     }
 
                     private readonly bool _allowMissingImplementation;
@@ -346,18 +346,18 @@ public class InlineInterfaceGeneratorTests
                             _setName_0 = setName_0;
                         }
 
-                        public event global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? NameChanged
+                        event global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.NameChanged
                         {
                             add => _eventCollection.NameChanged += value;
                             remove => _eventCollection.NameChanged -= value;
                         }
 
-                        public string LastName
+                        string global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.LastName
                         {
                             get => (_getLastName ?? throw new global::System.NotImplementedException())(_eventCollection);
                         }
 
-                        public void SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(_eventCollection, name);
+                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(_eventCollection, name);
                     }
 
                     private readonly bool _allowMissingImplementation;
