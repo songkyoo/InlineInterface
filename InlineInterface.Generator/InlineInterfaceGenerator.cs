@@ -36,15 +36,13 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         ImmutableArray<Diagnostic> Diagnostics
     )
     {
-        #region Static
         public static readonly TypeContext Empty = new(
             Diagnostics: ImmutableArray<Diagnostic>.Empty
         );
-        #endregion
     }
 
     private sealed record ImplementationOfTypeContext(
-        INamedTypeSymbol Symbol,
+        INamedTypeSymbol TypeSymbol,
         ImmutableArray<IEventSymbol> EventSymbols,
         ImmutableArray<IPropertySymbol> PropertySymbols,
         ImmutableArray<IMethodSymbol> MethodSymbols,
@@ -263,7 +261,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         }
 
         return new ImplementationOfTypeContext(
-            Symbol: typeSymbol,
+            TypeSymbol: typeSymbol,
             EventSymbols: eventSymbolsBuilder.ToImmutable(),
             PropertySymbols: propertySymbolsBuilder.ToImmutable(),
             MethodSymbols: methodSymbolsBuilder.ToImmutable(),
@@ -335,7 +333,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 {
                     AddSource(
                         context: sourceProductionContext,
-                        typeSymbol: implementationContext.Symbol,
+                        typeSymbol: implementationContext.TypeSymbol,
                         eventSymbols: implementationContext.EventSymbols,
                         propertySymbols: implementationContext.PropertySymbols,
                         methodSymbols: implementationContext.MethodSymbols

@@ -10,7 +10,6 @@ namespace Macaron.InlineInterface;
 internal static class SymbolHelpers
 {
     public sealed record PropertyContext(
-        string Type,
         string? GetterDelegateType,
         string? SetterDelegateType,
         string Name,
@@ -101,7 +100,6 @@ internal static class SymbolHelpers
             implementationLines.Add($"}}");
 
             builder.Add(new PropertyContext(
-                Type: propertyType,
                 GetterDelegateType: getterDelegateType,
                 SetterDelegateType: setterDelegateType,
                 Name: propertyName,
