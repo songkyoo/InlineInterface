@@ -1,43 +1,80 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 
-using static Macaron.InlineInterface.ParameterStringHelpers;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
+public sealed record PropertyContext(
+    string? GetterDelegateType,
+    string? SetterDelegateType,
+    string Name,
+    string? GetterName,
+    string? SetterName,
+    string? GetterParameterName,
+    string? SetterParameterName,
+    string? GetterFieldName,
+    string? SetterFieldName,
+    ImmutableArray<string> Implementation
+);
+
+public sealed record EventContext(
+    ImmutableArray<string> Implementation
+);
+
 internal static class SymbolHelpers
 {
-    public sealed record PropertyContext(
-        string? GetterDelegateType,
-        string? SetterDelegateType,
-        string Name,
-        string? GetterName,
-        string? SetterName,
-        string? GetterParameterName,
-        string? SetterParameterName,
-        string? GetterFieldName,
-        string? SetterFieldName,
-        ImmutableArray<string> Implementation
-    );
+    public static ImmutableArray<EventContext> CreateEventContexts(
+        INamedTypeSymbol interfaceSymbol,
+        ImmutableArray<IEventSymbol> eventSymbols,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
+        string indent
+    )
+    {
+        var interfaceType = GetTypeStrings(interfaceSymbol, genericParameterMap);
+        var builder = ImmutableArray.CreateBuilder<EventContext>();
 
-    public sealed record MethodContext(
-        string DelegateType,
-        string Name,
-        string UniqueName,
-        string ParameterName,
-        string FieldName,
-        string Implementation
-    );
+        foreach (var eventSymbol in eventSymbols)
+        {
+            if (eventSymbol.Type is not INamedTypeSymbol namedTypeSymbol)
+            {
+                continue;
+            }
+
+            var eventType = GetTypeStrings(namedTypeSymbol, genericParameterMap);
+
+            if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+            {
+                eventType += "?";
+            }
+
+            var implementationBuilder = ImmutableArray.CreateBuilder<string>();
+
+            implementationBuilder.Add($"event {eventType} {interfaceType}.{eventSymbol.Name}");
+            implementationBuilder.Add($"{{");
+            implementationBuilder.Add($"{indent}add => _eventCollection.{eventSymbol.Name} += value;");
+            implementationBuilder.Add($"{indent}remove => _eventCollection.{eventSymbol.Name} -= value;");
+            implementationBuilder.Add($"}}");
+
+            builder.Add(new EventContext(
+                Implementation: implementationBuilder.ToImmutable()
+            ));
+        }
+
+        return builder.ToImmutable();
+    }
 
     public static ImmutableArray<PropertyContext> CreatePropertyContexts(
-        string interfaceType,
+        INamedTypeSymbol interfaceSymbol,
         ImmutableArray<IPropertySymbol> propertySymbols,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string indent,
         bool hasEventMembers
     )
     {
+        var interfaceType = GetTypeStrings(interfaceSymbol, genericParameterMap);
         var builder = ImmutableArray.CreateBuilder<PropertyContext>();
 
         foreach (var propertySymbol in propertySymbols)
@@ -116,86 +153,10 @@ internal static class SymbolHelpers
         return builder.ToImmutable();
     }
 
-    public static ImmutableArray<MethodContext> CreateMethodContexts(
-        string interfaceType,
-        ImmutableArray<IMethodSymbol> methodSymbols,
-        bool hasEventMembers
-    )
-    {
-        var methodNameCounter = new Dictionary<string, int>();
-        var builder = ImmutableArray.CreateBuilder<MethodContext>();
-
-        foreach (var methodSymbol in methodSymbols)
-        {
-            var methodName = methodSymbol.Name;
-            var uniqueName = methodNameCounter.TryGetValue(methodName, out var count)
-                ? $"{methodName}_{count}"
-                : $"{methodName}_0";
-            var parameterName = $"{char.ToLowerInvariant(uniqueName[0])}{uniqueName[1..]}";
-            var fieldName = $"_{parameterName}";
-
-            methodNameCounter[methodName] = count + 1;
-
-            var paramTypes = new List<string>();
-            var parameters = new List<string>();
-            var arguments = new List<string>();
-
-            if (hasEventMembers)
-            {
-                paramTypes.Add("EventCollection");
-                arguments.Add("_eventCollection");
-            }
-
-            foreach (var paramSymbol in methodSymbol.Parameters)
-            {
-                var (type, name) = GetParameterString(paramSymbol);
-
-                paramTypes.Add(type);
-                parameters.Add($"{type} {name}");
-                arguments.Add(name);
-            };
-
-            var paramTypeList = string.Join(", ", paramTypes);
-            var paramList = string.Join(", ", parameters);
-            var argList = string.Join(", ", arguments);
-
-            string returnType;
-            string delegateType;
-
-            if (methodSymbol.ReturnsVoid)
-            {
-                returnType = "void";
-                delegateType = paramTypeList.Length > 0
-                    ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
-                    : $"global::System.Action";
-            }
-            else
-            {
-                returnType = methodSymbol.ReturnType.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-                    IncludeNullableReferenceTypeModifier |
-                    UseSpecialTypes
-                ));
-                delegateType = paramTypeList.Length > 0
-                    ? $"global::System.Func<{paramTypeList}, {returnType}>"
-                    : $"global::System.Func<{returnType}>";
-            }
-
-            builder.Add(new MethodContext(
-                DelegateType: delegateType,
-                Name: methodName,
-                UniqueName: uniqueName,
-                ParameterName: parameterName,
-                FieldName: fieldName,
-                Implementation: $"{returnType} {interfaceType}.{methodName}({paramList}) => ({fieldName} ?? throw new global::System.NotImplementedException())({argList});"
-            ));
-        }
-
-        return builder.ToImmutable();
-    }
-
     public static bool HasDuplicatedTypeParameterName(ImmutableArray<INamedTypeSymbol> typeSymbols)
     {
         var seen = new HashSet<string>();
+
         return typeSymbols.SelectMany(symbol => symbol.TypeParameters).Any(typeParam => !seen.Add(typeParam.Name));
     }
 
@@ -255,5 +216,54 @@ internal static class SymbolHelpers
         return constraints.Count > 0
             ? $"where {nameSelector(typeParameterSymbol.Name)} : {string.Join(", ", constraints)}"
             : "";
+    }
+
+    public static string GetTypeStrings(
+        INamedTypeSymbol typeSymbol,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
+    )
+    {
+        var typeSymbols = GetNestedTypeSymbols(typeSymbol);
+        var @namespace = typeSymbol.ContainingNamespace is { IsGlobalNamespace: false } containingNamespace
+            ? containingNamespace.ToDisplayString()
+            : "";
+        var types = new List<string>();
+
+        foreach (var symbol in typeSymbols)
+        {
+            var builder = new StringBuilder(symbol.Name);
+
+            if (symbol.Arity > 0)
+            {
+                builder.Append("<");
+
+                for (int i = 0; i < symbol.TypeArguments.Length; i++)
+                {
+                    if (i > 0)
+                    {
+                        builder.Append(", ");
+                    }
+
+                    var typeArgumentSymbol = symbol.TypeArguments[i];
+                    if (typeArgumentSymbol is ITypeParameterSymbol typeParameterSymbol)
+                    {
+                        builder.Append(genericParameterMap[typeParameterSymbol]);
+                    }
+                    else
+                    {
+                        builder.Append(typeArgumentSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+                            IncludeNullableReferenceTypeModifier |
+                            UseSpecialTypes
+                        )));
+                    }
+                }
+
+                builder.Append(">");
+            }
+
+            types.Add(builder.ToString());
+        }
+
+        return $"global::{(@namespace.Length > 0 ? $"{@namespace}." : "")}{string.Join(".", types)}";
     }
 }

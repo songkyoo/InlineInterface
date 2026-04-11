@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,22 +33,70 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         public sealed record NotApplicable : ExtractionResult;
     }
 
-    private record TypeContext(
-        ImmutableArray<Diagnostic> Diagnostics
-    )
+    private readonly struct InterfaceContextOrDiagnostics
     {
-        public static readonly TypeContext Empty = new(
-            Diagnostics: ImmutableArray<Diagnostic>.Empty
-        );
+        private readonly int _index;
+        private readonly InterfaceContext? _interfaceContext;
+        private readonly ImmutableArray<Diagnostic> _diagnostics;
+
+        public InterfaceContextOrDiagnostics(InterfaceContext interfaceContext)
+        {
+            _index = 1;
+            _interfaceContext = interfaceContext;
+            _diagnostics = ImmutableArray<Diagnostic>.Empty;
+        }
+
+        public InterfaceContextOrDiagnostics(ImmutableArray<Diagnostic> diagnostics)
+        {
+            _index = 2;
+            _interfaceContext = null;
+            _diagnostics = diagnostics;
+        }
+
+        public bool TryGetInterfaceContext([NotNullWhen(returnValue: true)]out InterfaceContext? value)
+        {
+            if (_index == 1)
+            {
+                value = _interfaceContext!;
+
+                return true;
+            }
+            else
+            {
+                value = null;
+
+                return false;
+            }
+        }
+
+        public bool TryGetDiagnostics(out ImmutableArray<Diagnostic> diagnostics)
+        {
+            if (_index == 2)
+            {
+                diagnostics = _diagnostics;
+
+                return true;
+            }
+            else
+            {
+                diagnostics = default;
+
+                return false;
+            }
+        }
     }
 
-    private sealed record ImplementationOfTypeContext(
-        INamedTypeSymbol TypeSymbol,
-        ImmutableArray<IEventSymbol> EventSymbols,
-        ImmutableArray<IPropertySymbol> PropertySymbols,
-        ImmutableArray<IMethodSymbol> MethodSymbols,
-        ImmutableArray<Diagnostic> Diagnostics
-    ) : TypeContext(Diagnostics);
+    private abstract record ValidationResult
+    {
+        public sealed record Success(
+            INamedTypeSymbol InterfaceSymbol,
+            ImmutableArray<InterfaceContext> Contexts
+        ) : ValidationResult;
+
+        public sealed record Failure(
+            ImmutableArray<Diagnostic> Diagnostics
+        ) : ValidationResult;
+    }
     #endregion
 
     #region Diagnostics
@@ -122,7 +171,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
         if (semanticModel.GetSymbolInfo(typeArgumentSyntax).Symbol is not INamedTypeSymbol
         {
-            ConstructedFrom: { } typeSymbol,
+            OriginalDefinition: { } typeSymbol,
         })
         {
             return new ExtractionResult.NotApplicable();
@@ -173,100 +222,127 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         #endregion
     }
 
-    private static TypeContext ValidateTypeSymbol(INamedTypeSymbol typeSymbol, TypeSyntax typeSyntax)
+    private static ValidationResult ValidateTypeSymbol(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
     {
-        var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
-        var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
-        var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+        var interfaceContextsBuilder = ImmutableArray.CreateBuilder<InterfaceContext>();
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
-        foreach (var member in typeSymbol.GetMembers())
+        foreach (var symbol in new[] { interfaceSymbol }.Concat(interfaceSymbol.AllInterfaces))
         {
-            switch (member)
+            var result = Validate(symbol, typeSyntax);
+
+            if (result.TryGetInterfaceContext(out var interfaceContext))
             {
-                case IPropertySymbol { IsStatic: false } property:
-                {
-                    propertySymbolsBuilder.Add(property);
-
-                    break;
-                }
-                case IEventSymbol { IsStatic: false } @event:
-                {
-                    eventSymbolsBuilder.Add(@event);
-
-                    break;
-                }
-                case IMethodSymbol { IsStatic: false } method:
-                {
-                    if (method.MethodKind
-                        is MethodKind.EventAdd or MethodKind.EventRemove
-                        or MethodKind.PropertyGet or MethodKind.PropertySet
-                    )
-                    {
-                        break;
-                    }
-
-                    if (method.IsGenericMethod)
-                    {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: NotAllowedGenericMethodRule,
-                            location: typeSyntax.GetLocation(),
-                            messageArgs: [typeSyntax, method.Name]
-                        ));
-
-                        break;
-                    }
-
-                    if (method.Parameters.Any(paramSymbol =>
-                    {
-                        return paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams;
-                    }))
-                    {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: NotAllowedMethodModifierRule,
-                            location: typeSyntax.GetLocation(),
-                            messageArgs: [typeSyntax, method.Name]
-                        ));
-
-                        break;
-                    }
-
-                    methodSymbolsBuilder.Add(method);
-
-                    break;
-                }
-                case { IsStatic: true }:
-                {
-                    break;
-                }
-                default:
-                {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: UnexpectedMemberTypeRule,
-                        location: typeSyntax.GetLocation(),
-                        messageArgs: [typeSyntax, member.Kind, member.Name]
-                    ));
-
-                    break;
-                }
+                interfaceContextsBuilder.Add(interfaceContext);
+            }
+            else if (result.TryGetDiagnostics(out var diagnostics))
+            {
+                diagnosticsBuilder.AddRange(diagnostics);
             }
         }
 
-        if (diagnosticsBuilder.Count > 0)
-        {
-            return TypeContext.Empty with
-            {
-                Diagnostics = diagnosticsBuilder.ToImmutable(),
-            };
-        }
+        return diagnosticsBuilder.Count > 0
+            ? new ValidationResult.Failure(Diagnostics: diagnosticsBuilder.ToImmutable())
+            : new ValidationResult.Success(
+                InterfaceSymbol: interfaceSymbol,
+                Contexts: interfaceContextsBuilder.ToImmutable()
+            );
 
-        return new ImplementationOfTypeContext(
-            TypeSymbol: typeSymbol,
-            EventSymbols: eventSymbolsBuilder.ToImmutable(),
-            PropertySymbols: propertySymbolsBuilder.ToImmutable(),
-            MethodSymbols: methodSymbolsBuilder.ToImmutable(),
-            Diagnostics: ImmutableArray<Diagnostic>.Empty
-        );
+        #region Local Functions
+        static InterfaceContextOrDiagnostics Validate(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
+        {
+            var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
+            var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
+            var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+
+            foreach (var member in interfaceSymbol.GetMembers())
+            {
+                switch (member)
+                {
+                    case IPropertySymbol { IsStatic: false } property:
+                    {
+                        propertySymbolsBuilder.Add(property);
+
+                        break;
+                    }
+                    case IEventSymbol { IsStatic: false } @event:
+                    {
+                        eventSymbolsBuilder.Add(@event);
+
+                        break;
+                    }
+                    case IMethodSymbol { IsStatic: false } method:
+                    {
+                        if (method.MethodKind
+                            is MethodKind.EventAdd or MethodKind.EventRemove
+                            or MethodKind.PropertyGet or MethodKind.PropertySet
+                        )
+                        {
+                            break;
+                        }
+
+                        if (method.IsGenericMethod)
+                        {
+                            diagnosticsBuilder.Add(Diagnostic.Create(
+                                descriptor: NotAllowedGenericMethodRule,
+                                location: typeSyntax.GetLocation(),
+                                messageArgs: [typeSyntax, method.Name]
+                            ));
+
+                            break;
+                        }
+
+                        if (method.Parameters.Any(paramSymbol =>
+                        {
+                            return paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams;
+                        }))
+                        {
+                            diagnosticsBuilder.Add(Diagnostic.Create(
+                                descriptor: NotAllowedMethodModifierRule,
+                                location: typeSyntax.GetLocation(),
+                                messageArgs: [typeSyntax, method.Name]
+                            ));
+
+                            break;
+                        }
+
+                        methodSymbolsBuilder.Add(method);
+
+                        break;
+                    }
+                    case { IsStatic: true }:
+                    {
+                        break;
+                    }
+                    default:
+                    {
+                        diagnosticsBuilder.Add(Diagnostic.Create(
+                            descriptor: UnexpectedMemberTypeRule,
+                            location: typeSyntax.GetLocation(),
+                            messageArgs: [typeSyntax, member.Kind, member.Name]
+                        ));
+
+                        break;
+                    }
+                }
+            }
+
+            if (diagnosticsBuilder.Count > 0)
+            {
+                return new InterfaceContextOrDiagnostics(diagnostics : diagnosticsBuilder.ToImmutable());
+            }
+            else
+            {
+                return new InterfaceContextOrDiagnostics(interfaceContext: new InterfaceContext(
+                        TypeSymbol: interfaceSymbol,
+                        EventSymbols: eventSymbolsBuilder.ToImmutable(),
+                        PropertySymbols: propertySymbolsBuilder.ToImmutable(),
+                        MethodSymbols: methodSymbolsBuilder.ToImmutable()
+                ));
+            }
+        }
+        #endregion
     }
     #endregion
 
@@ -286,7 +362,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             .SelectMany(static (results, _) =>
             {
                 var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                var builder = ImmutableArray.CreateBuilder<TypeContext>();
+                var builder = ImmutableArray.CreateBuilder<ValidationResult>();
 
                 foreach (var result in results)
                 {
@@ -294,10 +370,9 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                     {
                         case ExtractionResult.Failure failure:
                         {
-                            builder.Add(TypeContext.Empty with
-                            {
-                                Diagnostics = ImmutableArray.Create(failure.Diagnostic)
-                            });
+                            builder.Add(new ValidationResult.Failure(
+                                Diagnostics: ImmutableArray.Create(failure.Diagnostic)
+                            ));
 
                             break;
                         }
@@ -308,9 +383,9 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                                 continue;
                             }
 
-                            var typeContext = ValidateTypeSymbol(success.Symbol, success.Syntax);
+                            var validationResult = ValidateTypeSymbol(success.Symbol, success.Syntax);
 
-                            builder.Add(typeContext);
+                            builder.Add(validationResult);
 
                             break;
                         }
@@ -322,22 +397,27 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(
             source: validatedProvider,
-            action: (sourceProductionContext, typeContext) =>
+            action: (sourceProductionContext, validationResult) =>
             {
-                foreach (var diagnostic in typeContext.Diagnostics)
+                switch (validationResult)
                 {
-                    sourceProductionContext.ReportDiagnostic(diagnostic);
-                }
+                    case ValidationResult.Failure failure:
+                    {
+                        foreach (var diagnostic in failure.Diagnostics)
+                        {
+                            sourceProductionContext.ReportDiagnostic(diagnostic);
+                        }
 
-                if (typeContext is ImplementationOfTypeContext implementationContext)
-                {
-                    AddSource(
-                        context: sourceProductionContext,
-                        typeSymbol: implementationContext.TypeSymbol,
-                        eventSymbols: implementationContext.EventSymbols,
-                        propertySymbols: implementationContext.PropertySymbols,
-                        methodSymbols: implementationContext.MethodSymbols
-                    );
+                        break;
+                    }
+                    case ValidationResult.Success success:
+                    {
+                        var (interfaceSymbol, contexts) = success;
+
+                        AddSource(sourceProductionContext, interfaceSymbol, contexts);
+
+                        break;
+                    }
                 }
             }
         );

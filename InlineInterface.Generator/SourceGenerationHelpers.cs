@@ -17,19 +17,32 @@ internal static class SourceGenerationHelpers
     public static void AddSource(
         SourceProductionContext context,
         INamedTypeSymbol typeSymbol,
-        ImmutableArray<IEventSymbol> eventSymbols,
-        ImmutableArray<IPropertySymbol> propertySymbols,
-        ImmutableArray<IMethodSymbol> methodSymbols
+        ImmutableArray<InterfaceContext> interfaceContexts
     )
     {
         var (
             type,
             genericParameters,
-            genericParameterConstraints
+            genericParameterConstraints,
+            genericParameterMap
         ) = GetTypeStrings(typeSymbol);
-        var hasEventMembers = eventSymbols.Length > 0;
-        var propertyContexts = CreatePropertyContexts(type, propertySymbols, Indent, hasEventMembers);
-        var methodContexts = CreateMethodContexts(type, methodSymbols, hasEventMembers);
+
+        ImmutableArray<IEventSymbol> eventSymbols = interfaceContexts[0].EventSymbols;
+
+        var interfaceTypeStringProvider = new InterfaceTypeStringProvider(genericParameterMap);
+
+        var eventContexts = CreateEventContexts(interfaceContexts[0].TypeSymbol, interfaceContexts[0].EventSymbols, genericParameterMap, Indent);
+
+        var hasEventMembers = eventContexts.Length > 0;
+        var propertyContexts = interfaceContexts
+            .SelectMany(ctx => CreatePropertyContexts(ctx.TypeSymbol, ctx.PropertySymbols, genericParameterMap, Indent, hasEventMembers))
+            .ToImmutableArray();
+
+        var methodContextProvider = new MethodContextProvider(interfaceTypeStringProvider, hasEventMembers);
+        var methodImplementations = interfaceContexts
+            .SelectMany(ctx => ctx.MethodSymbols.Select(methodContextProvider.GetMethodImplementation))
+            .ToImmutableArray();
+        var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
@@ -216,25 +229,14 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // impl event implementations
-        foreach (var eventSymbol in eventSymbols)
+        foreach (var eventContext in eventContexts)
         {
             stringBuilder.AppendLine();
 
-            var eventType = eventSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-                IncludeNullableReferenceTypeModifier |
-                UseSpecialTypes
-            ));
-
-            if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+            foreach (var line in eventContext.Implementation)
             {
-                eventType += "?";
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
-
-            stringBuilder.AppendLine($"{depthSpacerText}event {eventType} {type}.{eventSymbol.Name}");
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}add => _eventCollection.{eventSymbol.Name} += value;");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}remove => _eventCollection.{eventSymbol.Name} -= value;");
-            stringBuilder.AppendLine($"{depthSpacerText}}}");
         }
 
         // impl property implementations
@@ -249,10 +251,10 @@ internal static class SourceGenerationHelpers
         }
 
         // impl method implementations
-        foreach (var methodContext in methodContexts)
+        foreach (var methodImplementation in methodImplementations)
         {
             stringBuilder.AppendLine();
-            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.Implementation}");
+            stringBuilder.AppendLine($"{depthSpacerText}{methodImplementation}");
         }
 
         // end impl type
@@ -610,7 +612,8 @@ internal static class SourceGenerationHelpers
     private static (
         string Type,
         string GenericParameters,
-        ImmutableArray<string> GenericParameterConstraints
+        ImmutableArray<string> GenericParameterConstraints,
+        ImmutableDictionary<ITypeParameterSymbol, string> GenericParameterMap
     ) GetTypeStrings(INamedTypeSymbol typeSymbol)
     {
         var typeSymbols = GetNestedTypeSymbols(typeSymbol);
@@ -634,7 +637,12 @@ internal static class SourceGenerationHelpers
             return (
                 Type: type,
                 GenericParameters: genericParameters,
-                GenericParameterConstraints: genericParameterConstraints
+                GenericParameterConstraints: genericParameterConstraints,
+                GenericParameterMap: typeParameters.ToImmutableDictionary(
+                    keySelector: static symbol => symbol,
+                    elementSelector: static symbol => symbol.Name,
+                    keyComparer: (IEqualityComparer<ITypeParameterSymbol>)SymbolEqualityComparer.Default
+                )
             );
         }
         else
@@ -645,6 +653,7 @@ internal static class SourceGenerationHelpers
             var types = new List<string>();
             var genericParameterConstraints = ImmutableArray.CreateBuilder<string>();
             var typeParameterIndex = 0;
+            var genericParameterMap = new Dictionary<ITypeParameterSymbol, string>(SymbolEqualityComparer.Default);
 
             foreach (var symbol in typeSymbols)
             {
@@ -664,8 +673,13 @@ internal static class SourceGenerationHelpers
                         }
 
                         var replacedTypeParameterName = $"T{typeParameterIndex + i}";
+
                         builder.Append(replacedTypeParameterName);
-                        mapper.Add(symbol.TypeParameters[i].Name, replacedTypeParameterName);
+
+                        var typeParameterSymbol = symbol.TypeParameters[i];
+
+                        mapper.Add(typeParameterSymbol.Name, replacedTypeParameterName);
+                        genericParameterMap.Add(typeParameterSymbol, replacedTypeParameterName);
                     }
 
                     builder.Append(">");
@@ -697,7 +711,13 @@ internal static class SourceGenerationHelpers
             return (
                 Type: type,
                 GenericParameters: genericParameters,
-                GenericParameterConstraints: genericParameterConstraints.ToImmutable()
+                GenericParameterConstraints: genericParameterConstraints.ToImmutable(),
+                GenericParameterMap: genericParameterMap
+                    .ToImmutableDictionary(
+                        keySelector: static kvp => kvp.Key,
+                        elementSelector: static kvp => kvp.Value,
+                        keyComparer: (IEqualityComparer<ITypeParameterSymbol>)SymbolEqualityComparer.Default
+                    )
             );
         }
     }

@@ -148,21 +148,21 @@ public class InlineInterfaceGeneratorTests
                         private readonly global::System.Func<string?>? _getFirstName;
                         private readonly global::System.Action<string?>? _setFirstName;
                         private readonly global::System.Func<string>? _getLastName;
-                        private readonly global::System.Func<string>? _getName_0;
-                        private readonly global::System.Action<string>? _setName_0;
+                        private readonly global::System.Func<string>? _method_GetName_0;
+                        private readonly global::System.Action<string>? _method_SetName_0;
 
                         public Impl(
                             global::System.Func<string?>? getFirstName,
                             global::System.Action<string?>? setFirstName,
                             global::System.Func<string>? getLastName,
-                            global::System.Func<string>? getName_0,
-                            global::System.Action<string>? setName_0)
+                            global::System.Func<string>? method_getName_0,
+                            global::System.Action<string>? method_setName_0)
                         {
                             _getFirstName = getFirstName;
                             _setFirstName = setFirstName;
                             _getLastName = getLastName;
-                            _getName_0 = getName_0;
-                            _setName_0 = setName_0;
+                            _method_GetName_0 = method_getName_0;
+                            _method_SetName_0 = method_setName_0;
                         }
 
                         string? global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.FirstName
@@ -176,9 +176,9 @@ public class InlineInterfaceGeneratorTests
                             get => (_getLastName ?? throw new global::System.NotImplementedException())();
                         }
 
-                        string global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.GetName() => (_getName_0 ?? throw new global::System.NotImplementedException())();
+                        string global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.GetName() => (_method_GetName_0 ?? throw new global::System.NotImplementedException())();
 
-                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(name);
+                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_method_SetName_0 ?? throw new global::System.NotImplementedException())(name);
                     }
 
                     private readonly bool _allowMissingImplementation;
@@ -189,34 +189,34 @@ public class InlineInterfaceGeneratorTests
 
                     private readonly global::System.Func<string>? GetLastName { get; init; } = null;
 
-                    private readonly global::System.Func<string>? GetName_0 { get; init; } = null;
+                    private readonly global::System.Func<string>? Method_GetName_0 { get; init; } = null;
 
-                    private readonly global::System.Action<string>? SetName_0 { get; init; } = null;
+                    private readonly global::System.Action<string>? Method_SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
                         bool allowMissingImplementation,
                         global::System.Func<string?>? getFirstName = null,
                         global::System.Action<string?>? setFirstName = null,
                         global::System.Func<string>? getLastName = null,
-                        global::System.Func<string>? getName_0 = null,
-                        global::System.Action<string>? setName_0 = null)
+                        global::System.Func<string>? method_getName_0 = null,
+                        global::System.Action<string>? method_setName_0 = null)
                     {
                         _allowMissingImplementation = allowMissingImplementation;
 
                         GetFirstName = getFirstName;
                         SetFirstName = setFirstName;
                         GetLastName = getLastName;
-                        GetName_0 = getName_0;
-                        SetName_0 = setName_0;
+                        Method_GetName_0 = method_getName_0;
+                        Method_SetName_0 = method_setName_0;
                     }
 
                     public Parent_1_IPerson_1Builder<T0, T1> FirstName(global::System.Func<string?> getter, global::System.Action<string?> setter) => this with { GetFirstName = getter, SetFirstName = setter };
 
                     public Parent_1_IPerson_1Builder<T0, T1> LastName(global::System.Func<string> getter) => this with { GetLastName = getter };
 
-                    public Parent_1_IPerson_1Builder<T0, T1> GetName(global::System.Func<string> impl) => this with { GetName_0 = impl };
+                    public Parent_1_IPerson_1Builder<T0, T1> GetName(global::System.Func<string> impl) => this with { Method_GetName_0 = impl };
 
-                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<string> impl) => this with { SetName_0 = impl };
+                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<string> impl) => this with { Method_SetName_0 = impl };
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
@@ -224,8 +224,8 @@ public class InlineInterfaceGeneratorTests
                             getFirstName: GetFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
                             setFirstName: SetFirstName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
                             getLastName: GetLastName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            getName_0: GetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            setName_0: SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
+                            method_getName_0: Method_GetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            method_setName_0: Method_SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
                     }
                 }
             }
@@ -259,7 +259,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, getName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_getName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1> SetName<T0, T1>(
@@ -268,7 +268,7 @@ public class InlineInterfaceGeneratorTests
                         where T0 : class
                         where T1 : struct
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, setName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_setName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build<T0, T1>(
@@ -336,14 +336,14 @@ public class InlineInterfaceGeneratorTests
                     {
                         private readonly EventCollection _eventCollection = new();
                         private readonly global::System.Func<EventCollection, string>? _getLastName;
-                        private readonly global::System.Action<EventCollection, string>? _setName_0;
+                        private readonly global::System.Action<EventCollection, string>? _method_SetName_0;
 
                         public Impl(
                             global::System.Func<EventCollection, string>? getLastName,
-                            global::System.Action<EventCollection, string>? setName_0)
+                            global::System.Action<EventCollection, string>? method_setName_0)
                         {
                             _getLastName = getLastName;
-                            _setName_0 = setName_0;
+                            _method_SetName_0 = method_setName_0;
                         }
 
                         event global::System.Func<global::Macaron.InlineInterface.Tests.Foo?, string>? global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.NameChanged
@@ -357,35 +357,35 @@ public class InlineInterfaceGeneratorTests
                             get => (_getLastName ?? throw new global::System.NotImplementedException())(_eventCollection);
                         }
 
-                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_setName_0 ?? throw new global::System.NotImplementedException())(_eventCollection, name);
+                        void global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>.SetName(string name) => (_method_SetName_0 ?? throw new global::System.NotImplementedException())(_eventCollection, name);
                     }
 
                     private readonly bool _allowMissingImplementation;
 
                     private readonly global::System.Func<EventCollection, string>? GetLastName { get; init; } = null;
 
-                    private readonly global::System.Action<EventCollection, string>? SetName_0 { get; init; } = null;
+                    private readonly global::System.Action<EventCollection, string>? Method_SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
                         bool allowMissingImplementation,
                         global::System.Func<EventCollection, string>? getLastName = null,
-                        global::System.Action<EventCollection, string>? setName_0 = null)
+                        global::System.Action<EventCollection, string>? method_setName_0 = null)
                     {
                         _allowMissingImplementation = allowMissingImplementation;
 
                         GetLastName = getLastName;
-                        SetName_0 = setName_0;
+                        Method_SetName_0 = method_setName_0;
                     }
 
                     public Parent_1_IPerson_1Builder<T0, T1> LastName(global::System.Func<EventCollection, string> getter) => this with { GetLastName = getter };
 
-                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<EventCollection, string> impl) => this with { SetName_0 = impl };
+                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<EventCollection, string> impl) => this with { Method_SetName_0 = impl };
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
                         return new Impl(
                             getLastName: GetLastName ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            setName_0: SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
+                            method_setName_0: Method_SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
                     }
                 }
             }
@@ -405,7 +405,7 @@ public class InlineInterfaceGeneratorTests
                         this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1>> implementationOf,
                         global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventCollection, string> impl)
                     {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, setName_0: impl);
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_setName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build<T0, T1>(
@@ -413,6 +413,182 @@ public class InlineInterfaceGeneratorTests
                         global::Macaron.InlineInterface.Tag _ = default)
                     {
                         return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>(allowMissingImplementation: implementationOf.AllowMissingImplementation).Build(_);
+                    }
+                }
+            }
+
+            """
+        );
+    }
+
+    [Test]
+    public void When_InterfaceHasInheritance_Should_GenerateInheritanceMembers()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            using System;
+
+            namespace Macaron.InlineInterface.Tests
+            {
+                namespace Inner
+                {
+                    public interface IFoo<T>
+                    {
+                        string GetLastName();
+                    }
+                }
+
+                public interface IBar<T>
+                {
+                    string GetFirstName();
+
+                    string GetLastName();
+                }
+
+                public interface IBaz<T> : IBar<int>
+                {
+                    void SetName(string name);
+
+                    string GetLastName(int index);
+                }
+
+                public class Foo<T>
+                {
+                    public interface IFooBar<T, U> : Inner.IFoo<T>, IBaz<U>
+                    {
+                    }
+                }
+
+                public class TestClass
+                {
+                    public void TestMethod()
+                    {
+                        var implementationOf = Implementation.Of<Foo<float>.IFooBar<string, int>>();
+                    }
+                }
+            }
+            """,
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests
+            {
+                internal readonly struct Foo_1_IFooBar_2Builder<T0, T1, T2>
+                {
+                    private sealed class Impl : global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>
+                    {
+                        private readonly global::System.Func<string>? _method_GetLastName_0;
+                        private readonly global::System.Func<int, string>? _method_GetLastName_1;
+                        private readonly global::System.Action<string>? _method_SetName_0;
+                        private readonly global::System.Func<string>? _method_GetFirstName_0;
+
+                        public Impl(
+                            global::System.Func<string>? method_GetLastName_0,
+                            global::System.Func<int, string>? method_GetLastName_1,
+                            global::System.Action<string>? method_SetName_0,
+                            global::System.Func<string>? method_GetFirstName_0)
+                        {
+                            _method_GetLastName_0 = method_GetLastName_0;
+                            _method_GetLastName_1 = method_GetLastName_1;
+                            _method_SetName_0 = method_SetName_0;
+                            _method_GetFirstName_0 = method_GetFirstName_0;
+                        }
+
+                        string global::Macaron.InlineInterface.Tests.Inner.IFoo<T1>.GetLastName() => (_method_GetLastName_0 ?? throw new global::System.NotImplementedException())();
+
+                        void global::Macaron.InlineInterface.Tests.IBaz<T2>.SetName(string name) => (_method_SetName_0 ?? throw new global::System.NotImplementedException())(name);
+
+                        string global::Macaron.InlineInterface.Tests.IBaz<T2>.GetLastName(int index) => (_method_GetLastName_1 ?? throw new global::System.NotImplementedException())(index);
+
+                        string global::Macaron.InlineInterface.Tests.IBar<int>.GetFirstName() => (_method_GetFirstName_0 ?? throw new global::System.NotImplementedException())();
+
+                        string global::Macaron.InlineInterface.Tests.IBar<int>.GetLastName() => (_method_GetLastName_0 ?? throw new global::System.NotImplementedException())();
+                    }
+
+                    private readonly bool _allowMissingImplementation;
+
+                    private readonly global::System.Func<string>? Method_GetLastName_0 { get; init; } = null;
+
+                    private readonly global::System.Func<int, string>? Method_GetLastName_1 { get; init; } = null;
+
+                    private readonly global::System.Action<string>? Method_SetName_0 { get; init; } = null;
+
+                    private readonly global::System.Func<string>? Method_GetFirstName_0 { get; init; } = null;
+
+                    public Foo_1_IFooBar_2Builder(
+                        bool allowMissingImplementation,
+                        global::System.Func<string>? method_GetLastName_0 = null,
+                        global::System.Func<int, string>? method_GetLastName_1 = null,
+                        global::System.Action<string>? method_SetName_0 = null,
+                        global::System.Func<string>? method_GetFirstName_0 = null)
+                    {
+                        _allowMissingImplementation = allowMissingImplementation;
+
+                        Method_GetLastName_0 = method_GetLastName_0;
+                        Method_GetLastName_1 = method_GetLastName_1;
+                        Method_SetName_0 = method_SetName_0;
+                        Method_GetFirstName_0 = method_GetFirstName_0;
+                    }
+
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<string> impl) => this with { Method_GetLastName_0 = impl };
+
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<int, string> impl) => this with { Method_GetLastName_1 = impl };
+
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> SetName(global::System.Action<string> impl) => this with { Method_SetName_0 = impl };
+
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName(global::System.Func<string> impl) => this with { Method_GetFirstName_0 = impl };
+
+                    public global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2> Build(global::Macaron.InlineInterface.Tag _ = default)
+                    {
+                        return new Impl(
+                            method_GetLastName_0: Method_GetLastName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            method_GetLastName_1: Method_GetLastName_1 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            method_SetName_0: Method_SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
+                            method_GetFirstName_0: Method_GetFirstName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
+                    }
+                }
+            }
+
+            namespace Macaron.InlineInterface
+            {
+                internal static partial class ImplementationOfExtensions
+                {
+                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::System.Func<string> impl)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_GetLastName_0: impl);
+                    }
+
+                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::System.Func<int, string> impl)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_GetLastName_1: impl);
+                    }
+
+                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> SetName<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::System.Action<string> impl)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_SetName_0: impl);
+                    }
+
+                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::System.Func<string> impl)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_GetFirstName_0: impl);
+                    }
+
+                    public static global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2> Build<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::Macaron.InlineInterface.Tag _ = default)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation).Build(_);
                     }
                 }
             }
