@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using static Macaron.InlineInterface.SourceGenerationHelpers;
+using static Microsoft.CodeAnalysis.Accessibility;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Macaron.InlineInterface;
@@ -140,6 +141,14 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+    private static readonly DiagnosticDescriptor TargetTypeMustBeAccessibleRule = new(
+        id: "MII0006",
+        title: "Target type must be accessible",
+        messageFormat: "Type '{0}' is not accessible from generated code. Target interfaces and all containing types must be public, internal, or protected internal.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
     #endregion
 
     #region Static
@@ -204,6 +213,17 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             );
         }
 
+        if (!IsAccessibleFromGeneratedCode(typeSymbol))
+        {
+            return new ExtractionResult.Failure(
+                Diagnostic: Diagnostic.Create(
+                    descriptor: TargetTypeMustBeAccessibleRule,
+                    location: typeArgumentSyntax.GetLocation(),
+                    messageArgs: [typeArgumentSyntax]
+                )
+            );
+        }
+
         return new ExtractionResult.Success(
             Symbol: typeSymbol,
             Syntax: typeArgumentSyntax
@@ -218,6 +238,30 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 GenericNameSyntax genericName => genericName,
                 _ => null,
             };
+        }
+
+        static bool IsAccessibleFromGeneratedCode(INamedTypeSymbol typeSymbol)
+        {
+            var current = typeSymbol;
+
+            while (current is not null)
+            {
+                if (!IsAllowedAccessibility(current.DeclaredAccessibility))
+                {
+                    return false;
+                }
+
+                current = current.ContainingType;
+            }
+
+            return true;
+
+            #region Local Functions
+            static bool IsAllowedAccessibility(Accessibility accessibility)
+            {
+                return accessibility is Public or Internal or ProtectedOrInternal;
+            }
+            #endregion
         }
         #endregion
     }
