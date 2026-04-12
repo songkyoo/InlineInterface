@@ -17,7 +17,7 @@ public sealed class InterfaceTypeStringProvider(ImmutableDictionary<ITypeParamet
             return name;
         }
 
-        name = SymbolHelpers.GetTypeStrings(interfaceSymbol, genericParameterMap);
+        name = SymbolHelpers.GetTypeString(interfaceSymbol, genericParameterMap);
 
         _cache.Add(interfaceSymbol, name);
 

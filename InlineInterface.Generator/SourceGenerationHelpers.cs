@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Text;
 using static System.Linq.Enumerable;
 using static Macaron.InlineInterface.SymbolHelpers;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
-using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
@@ -27,20 +26,31 @@ internal static class SourceGenerationHelpers
             genericParameterMap
         ) = GetTypeStrings(typeSymbol);
 
-        ImmutableArray<IEventSymbol> eventSymbols = interfaceContexts[0].EventSymbols;
+        var eventSymbols = interfaceContexts.SelectMany(ctx => ctx.EventSymbols).ToImmutableArray();
+        var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
 
         var interfaceTypeStringProvider = new InterfaceTypeStringProvider(genericParameterMap);
 
-        var eventContexts = CreateEventContexts(interfaceContexts[0].TypeSymbol, interfaceContexts[0].EventSymbols, genericParameterMap, Indent);
+        var eventContextProvider = new EventContextProvider(
+            eventSymbols,
+            genericParameterMap,
+            interfaceTypeStringProvider,
+            Indent
+        );
+        var eventContexts = eventContextProvider.Contexts.ToImmutableArray();
+        var hasEventMembers = eventContexts.Any();
 
-        var hasEventMembers = eventContexts.Length > 0;
         var propertyContexts = interfaceContexts
             .SelectMany(ctx => CreatePropertyContexts(ctx.TypeSymbol, ctx.PropertySymbols, genericParameterMap, Indent, hasEventMembers))
             .ToImmutableArray();
 
-        var methodContextProvider = new MethodContextProvider(interfaceTypeStringProvider, hasEventMembers);
-        var methodImplementations = interfaceContexts
-            .SelectMany(ctx => ctx.MethodSymbols.Select(methodContextProvider.GetMethodImplementation))
+        var methodContextProvider = new MethodContextProvider(
+            genericParameterMap,
+            interfaceTypeStringProvider,
+            hasEventMembers
+        );
+        var methodImplementations = methodSymbols
+            .Select(methodContextProvider.GetMethodImplementation)
             .ToImmutableArray();
         var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
 
@@ -84,31 +94,47 @@ internal static class SourceGenerationHelpers
 
         if (hasEventMembers)
         {
+            // EventCollection
             stringBuilder.AppendLine($"{depthSpacerText}public sealed class EventCollection");
-            stringBuilder.Append($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
 
             depthSpacerText += Indent;
+
+            foreach (var eventContext in eventContexts)
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}public {eventContext.Type} {eventContext.UniqueName};");
+            }
+
+            depthSpacerText = depthSpacerText[..^Indent.Length];
+
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
+            stringBuilder.AppendLine();
+
+            // EventDispatcher
+            stringBuilder.AppendLine($"{depthSpacerText}public sealed class EventDispatcher");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+
+            depthSpacerText += Indent;
+
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly EventCollection _eventCollection;");
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine($"{depthSpacerText}public EventDispatcher(EventCollection eventCollection)");
+            stringBuilder.AppendLine($"{depthSpacerText}{{");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}_eventCollection = eventCollection;");
+            stringBuilder.AppendLine($"{depthSpacerText}}}");
 
             foreach (var eventSymbol in eventSymbols)
             {
                 stringBuilder.AppendLine();
 
-                var eventType = eventSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-                    IncludeNullableReferenceTypeModifier |
-                    UseSpecialTypes
-                ));
-
-                if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+                foreach (var line in eventContextProvider.GetEventDispatcherImplementation(eventSymbol))
                 {
-                    eventType += "?";
+                    stringBuilder.AppendLine($"{depthSpacerText}{line}");
                 }
-
-                stringBuilder.Append($"{depthSpacerText}public {eventType} {eventSymbol.Name};");
             }
 
             depthSpacerText = depthSpacerText[..^Indent.Length];
 
-            stringBuilder.AppendLine();
             stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
@@ -122,6 +148,7 @@ internal static class SourceGenerationHelpers
         if (hasEventMembers)
         {
             stringBuilder.AppendLine($"{depthSpacerText}private readonly EventCollection _eventCollection = new();");
+            stringBuilder.AppendLine($"{depthSpacerText}private readonly EventDispatcher _eventDispatcher;");
         }
 
         foreach (var propertyContext in propertyContexts)
@@ -197,6 +224,11 @@ internal static class SourceGenerationHelpers
         // begin impl constructor body
         depthSpacerText += Indent;
 
+        if (hasEventMembers)
+        {
+            stringBuilder.AppendLine($"{depthSpacerText}_eventDispatcher = new EventDispatcher(_eventCollection);");
+        }
+
         foreach (var propertyContext in propertyContexts)
         {
             if (propertyContext is
@@ -229,11 +261,11 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // impl event implementations
-        foreach (var eventContext in eventContexts)
+        foreach (var eventSymbol in eventSymbols)
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in eventContext.Implementation)
+            foreach (var line in eventContextProvider.GetInterfaceImplementation(eventSymbol))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
@@ -537,7 +569,7 @@ internal static class SourceGenerationHelpers
         {
             stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{(hasEventMembers ? methodContext.DelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : methodContext.DelegateType)} impl)");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{(hasEventMembers ? methodContext.DelegateType.Replace("<EventDispatcher", $"<{globalTypeBuilder}.EventDispatcher") : methodContext.DelegateType)} impl)");
 
             // constraints
             foreach (var constraint in genericParameterConstraints)

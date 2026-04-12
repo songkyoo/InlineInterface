@@ -2,12 +2,10 @@
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InlineInterface.ParameterStringHelpers;
-using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
-using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
-public sealed class MethodContextProvider(InterfaceTypeStringProvider interfaceTypeStringProvider, bool hasEventMembers)
+public sealed class MethodContextProvider(ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap, InterfaceTypeStringProvider interfaceTypeStringProvider, bool hasEventMembers)
 {
     #region Static Methods
     private static bool MatchesMethodSignature(
@@ -98,18 +96,18 @@ public sealed class MethodContextProvider(InterfaceTypeStringProvider interfaceT
 
         if (hasEventMembers)
         {
-            paramTypes.Add("EventCollection");
-            arguments.Add("_eventCollection");
+            paramTypes.Add("EventDispatcher");
+            arguments.Add("_eventDispatcher");
         }
 
         foreach (var paramSymbol in methodSymbol.Parameters)
         {
-            var (type, name) = GetParameterString(paramSymbol);
+            var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
 
             paramTypes.Add(type);
             parameters.Add($"{type} {name}");
             arguments.Add(name);
-        };
+        }
 
         var paramTypeList = string.Join(", ", paramTypes);
 
@@ -125,10 +123,7 @@ public sealed class MethodContextProvider(InterfaceTypeStringProvider interfaceT
         }
         else
         {
-            returnType = methodSymbol.ReturnType.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-                IncludeNullableReferenceTypeModifier |
-                UseSpecialTypes
-            ));
+            returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
             delegateType = paramTypeList.Length > 0
                 ? $"global::System.Func<{paramTypeList}, {returnType}>"
                 : $"global::System.Func<{returnType}>";

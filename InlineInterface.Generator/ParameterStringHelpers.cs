@@ -1,18 +1,16 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-
-using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
-using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
 internal static class ParameterStringHelpers
 {
-    public static (string Type, string Name) GetParameterString(IParameterSymbol parameterSymbol)
+    public static (string Type, string Name) GetParameterString(
+        IParameterSymbol parameterSymbol,
+        ImmutableDictionary<ITypeParameterSymbol, string > genericParameterMap
+    )
     {
-        var typeString = parameterSymbol.Type.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-            IncludeNullableReferenceTypeModifier |
-            UseSpecialTypes
-        ));
+        var typeString = SymbolHelpers.GetTypeString(parameterSymbol.Type, genericParameterMap);
         var nameString = GetCamelCaseName(parameterSymbol.Name);
 
         return (typeString, nameString);

@@ -20,52 +20,8 @@ public sealed record PropertyContext(
     ImmutableArray<string> Implementation
 );
 
-public sealed record EventContext(
-    ImmutableArray<string> Implementation
-);
-
 internal static class SymbolHelpers
 {
-    public static ImmutableArray<EventContext> CreateEventContexts(
-        INamedTypeSymbol interfaceSymbol,
-        ImmutableArray<IEventSymbol> eventSymbols,
-        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
-        string indent
-    )
-    {
-        var interfaceType = GetTypeStrings(interfaceSymbol, genericParameterMap);
-        var builder = ImmutableArray.CreateBuilder<EventContext>();
-
-        foreach (var eventSymbol in eventSymbols)
-        {
-            if (eventSymbol.Type is not INamedTypeSymbol namedTypeSymbol)
-            {
-                continue;
-            }
-
-            var eventType = GetTypeStrings(namedTypeSymbol, genericParameterMap);
-
-            if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
-            {
-                eventType += "?";
-            }
-
-            var implementationBuilder = ImmutableArray.CreateBuilder<string>();
-
-            implementationBuilder.Add($"event {eventType} {interfaceType}.{eventSymbol.Name}");
-            implementationBuilder.Add($"{{");
-            implementationBuilder.Add($"{indent}add => _eventCollection.{eventSymbol.Name} += value;");
-            implementationBuilder.Add($"{indent}remove => _eventCollection.{eventSymbol.Name} -= value;");
-            implementationBuilder.Add($"}}");
-
-            builder.Add(new EventContext(
-                Implementation: implementationBuilder.ToImmutable()
-            ));
-        }
-
-        return builder.ToImmutable();
-    }
-
     public static ImmutableArray<PropertyContext> CreatePropertyContexts(
         INamedTypeSymbol interfaceSymbol,
         ImmutableArray<IPropertySymbol> propertySymbols,
@@ -74,7 +30,7 @@ internal static class SymbolHelpers
         bool hasEventMembers
     )
     {
-        var interfaceType = GetTypeStrings(interfaceSymbol, genericParameterMap);
+        var interfaceType = GetTypeString(interfaceSymbol, genericParameterMap);
         var builder = ImmutableArray.CreateBuilder<PropertyContext>();
 
         foreach (var propertySymbol in propertySymbols)
@@ -210,7 +166,7 @@ internal static class SymbolHelpers
 
         if (typeParameterSymbol.HasNotNullConstraint)
         {
-            constraints.Add("not null");
+            constraints.Add("notnull");
         }
 
         return constraints.Count > 0
@@ -218,7 +174,59 @@ internal static class SymbolHelpers
             : "";
     }
 
-    public static string GetTypeStrings(
+    public static string GetTypeString(
+        ITypeSymbol typeSymbol,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
+    )
+    {
+        string typeString;
+
+        switch (typeSymbol)
+        {
+            case INamedTypeSymbol namedTypeSymbol:
+            {
+                var specialTypeKeyword = GetSpecialTypeKeyword(namedTypeSymbol);
+
+                typeString = specialTypeKeyword ?? GetNamedTypeString(namedTypeSymbol, genericParameterMap);
+
+                break;
+            }
+            case ITypeParameterSymbol typeParameterSymbol:
+            {
+                typeString =  genericParameterMap.TryGetValue(typeParameterSymbol, out var mapped)
+                    ? mapped
+                    : typeParameterSymbol.Name;
+
+                break;
+            }
+            case IArrayTypeSymbol arrayTypeSymbol:
+            {
+                var brackets = $"[{new string(',', arrayTypeSymbol.Rank - 1)}]";
+
+                typeString = $"{GetTypeString(arrayTypeSymbol.ElementType, genericParameterMap)}{brackets}";
+
+                break;
+            }
+            default:
+            {
+                typeString = typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+                    IncludeNullableReferenceTypeModifier |
+                    UseSpecialTypes
+                ));
+
+                break;
+            }
+        }
+
+        if (typeSymbol.NullableAnnotation == NullableAnnotation.Annotated && !typeString.EndsWith("?"))
+        {
+            typeString += "?";
+        }
+
+        return typeString;
+    }
+
+    private static string GetNamedTypeString(
         INamedTypeSymbol typeSymbol,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
@@ -237,25 +245,14 @@ internal static class SymbolHelpers
             {
                 builder.Append("<");
 
-                for (int i = 0; i < symbol.TypeArguments.Length; i++)
+                for (var i = 0; i < symbol.TypeArguments.Length; i++)
                 {
                     if (i > 0)
                     {
                         builder.Append(", ");
                     }
 
-                    var typeArgumentSymbol = symbol.TypeArguments[i];
-                    if (typeArgumentSymbol is ITypeParameterSymbol typeParameterSymbol)
-                    {
-                        builder.Append(genericParameterMap[typeParameterSymbol]);
-                    }
-                    else
-                    {
-                        builder.Append(typeArgumentSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
-                            IncludeNullableReferenceTypeModifier |
-                            UseSpecialTypes
-                        )));
-                    }
+                    builder.Append(GetTypeString(symbol.TypeArguments[i], genericParameterMap));
                 }
 
                 builder.Append(">");
@@ -265,5 +262,29 @@ internal static class SymbolHelpers
         }
 
         return $"global::{(@namespace.Length > 0 ? $"{@namespace}." : "")}{string.Join(".", types)}";
+    }
+
+    private static string? GetSpecialTypeKeyword(INamedTypeSymbol typeSymbol)
+    {
+        return typeSymbol.SpecialType switch
+        {
+            SpecialType.System_Boolean => "bool",
+            SpecialType.System_Byte => "byte",
+            SpecialType.System_SByte => "sbyte",
+            SpecialType.System_Int16 => "short",
+            SpecialType.System_UInt16 => "ushort",
+            SpecialType.System_Int32 => "int",
+            SpecialType.System_UInt32 => "uint",
+            SpecialType.System_Int64 => "long",
+            SpecialType.System_UInt64 => "ulong",
+            SpecialType.System_Single => "float",
+            SpecialType.System_Double => "double",
+            SpecialType.System_Decimal => "decimal",
+            SpecialType.System_Char => "char",
+            SpecialType.System_String => "string",
+            SpecialType.System_Object => "object",
+            SpecialType.System_Void => "void",
+            _ => null,
+        };
     }
 }
