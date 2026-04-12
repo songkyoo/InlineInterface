@@ -649,109 +649,64 @@ internal static class SourceGenerationHelpers
     ) GetTypeStrings(INamedTypeSymbol typeSymbol)
     {
         var typeSymbols = GetNestedTypeSymbols(typeSymbol);
+        var typeParameters = typeSymbols
+            .SelectMany(static symbol => symbol.TypeParameters)
+            .ToArray();
 
-        if (!HasDuplicatedTypeParameterName(typeSymbols))
+        var genericParameterMap = CreateGenericParameterMap(typeSymbols);
+
+        var genericParameterConstraints = typeParameters
+            .Select(symbol => GetTypeParameterConstraintClause(
+                typeParameterSymbol: symbol,
+                typeParameterNameSelector: symbol2 => genericParameterMap[symbol2],
+                typeStringSelector: type => GetTypeString(type, genericParameterMap)
+            ))
+            .Where(static clause => clause.Length > 0)
+            .ToImmutableArray();
+
+        var type = GetTypeString(typeSymbol, genericParameterMap);
+
+        var genericParameters = typeParameters.Length > 0
+            ? $"<{string.Join(", ", typeParameters.Select(symbol => genericParameterMap[symbol]))}>"
+            : "";
+
+        return (
+            Type: type,
+            GenericParameters: genericParameters,
+            GenericParameterConstraints: genericParameterConstraints,
+            GenericParameterMap: genericParameterMap
+        );
+
+        #region Local Functions
+        static ImmutableDictionary<ITypeParameterSymbol, string> CreateGenericParameterMap(
+            ImmutableArray<INamedTypeSymbol> typeSymbols
+        )
         {
-            var typeParameters = typeSymbols
-                .SelectMany(static symbol => symbol.TypeParameters)
-                .ToArray();
-
-            var type = typeSymbol.ToDisplayString(FullyQualifiedFormat);
-            var genericParameters = string.Join(
-                ", ",
-                typeParameters.Select(static symbol => symbol.Name)
-            ) is { Length: > 0 } parameters ? $"<{parameters }>": "";
-            var genericParameterConstraints = typeParameters
-                .Select(static symbol => GetTypeParameterConstraintClause(symbol, static name => name))
-                .Where(static constraint => constraint.Length > 0)
-                .ToImmutableArray();
-
-            return (
-                Type: type,
-                GenericParameters: genericParameters,
-                GenericParameterConstraints: genericParameterConstraints,
-                GenericParameterMap: typeParameters.ToImmutableDictionary(
-                    keySelector: static symbol => symbol,
-                    elementSelector: static symbol => symbol.Name,
-                    keyComparer: (IEqualityComparer<ITypeParameterSymbol>)SymbolEqualityComparer.Default
-                )
+            var builder = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, string>(
+                SymbolEqualityComparer.Default
             );
-        }
-        else
-        {
-            var @namespace = typeSymbol.ContainingNamespace is { IsGlobalNamespace: false } containingNamespace
-                ? containingNamespace.ToDisplayString()
-                : "";
-            var types = new List<string>();
-            var genericParameterConstraints = ImmutableArray.CreateBuilder<string>();
-            var typeParameterIndex = 0;
-            var genericParameterMap = new Dictionary<ITypeParameterSymbol, string>(SymbolEqualityComparer.Default);
 
-            foreach (var symbol in typeSymbols)
+            if (!HasDuplicatedTypeParameterName(typeSymbols))
             {
-                var builder = new StringBuilder(symbol.Name);
-
-                if (symbol.Arity > 0)
+                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
                 {
-                    var mapper = new Dictionary<string, string>();
-
-                    builder.Append("<");
-
-                    for (int i = 0; i < symbol.Arity; i++)
-                    {
-                        if (i > 0)
-                        {
-                            builder.Append(", ");
-                        }
-
-                        var replacedTypeParameterName = $"T{typeParameterIndex + i}";
-
-                        builder.Append(replacedTypeParameterName);
-
-                        var typeParameterSymbol = symbol.TypeParameters[i];
-
-                        mapper.Add(typeParameterSymbol.Name, replacedTypeParameterName);
-                        genericParameterMap.Add(typeParameterSymbol, replacedTypeParameterName);
-                    }
-
-                    builder.Append(">");
-
-                    typeParameterIndex += symbol.Arity;
-
-                    foreach (var typeParameterSymbol in symbol.TypeParameters)
-                    {
-                        var clause = GetTypeParameterConstraintClause(
-                            typeParameterSymbol,
-                            name => mapper[name]
-                        );
-
-                        if (clause.Length > 0)
-                        {
-                            genericParameterConstraints.Add(clause);
-                        }
-                    }
+                    builder.Add(typeParameter, typeParameter.Name);
                 }
+            }
+            else
+            {
+                var index = 0;
 
-                types.Add(builder.ToString());
+                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
+                {
+                    builder.Add(typeParameter, $"T{index}");
+                    index += 1;
+                }
             }
 
-            var type = $"global::{(@namespace.Length > 0 ? $"{@namespace}." : "")}{string.Join(".", types)}";
-            var genericParameters = typeParameterIndex > 0
-                ? $"<{string.Join(", ", Range(0, typeParameterIndex).Select(static index => $"T{index}"))}>"
-                : "";
-
-            return (
-                Type: type,
-                GenericParameters: genericParameters,
-                GenericParameterConstraints: genericParameterConstraints.ToImmutable(),
-                GenericParameterMap: genericParameterMap
-                    .ToImmutableDictionary(
-                        keySelector: static kvp => kvp.Key,
-                        elementSelector: static kvp => kvp.Value,
-                        keyComparer: (IEqualityComparer<ITypeParameterSymbol>)SymbolEqualityComparer.Default
-                    )
-            );
+            return builder.ToImmutable();
         }
+        #endregion
     }
 
     private static string GetHintName(INamedTypeSymbol typeSymbol)

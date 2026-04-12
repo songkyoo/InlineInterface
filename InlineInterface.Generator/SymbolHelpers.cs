@@ -134,29 +134,56 @@ internal static class SymbolHelpers
 
     public static string GetTypeParameterConstraintClause(
         ITypeParameterSymbol typeParameterSymbol,
-        Func<string, string> nameSelector
+        Func<ITypeParameterSymbol, string> typeParameterNameSelector,
+        Func<ITypeSymbol, string> typeStringSelector
     )
     {
         var constraints = new List<string>();
-
-        if (typeParameterSymbol.HasReferenceTypeConstraint)
-        {
-            constraints.Add("class");
-        }
 
         if (typeParameterSymbol.HasUnmanagedTypeConstraint)
         {
             constraints.Add("unmanaged");
         }
-
-        if (typeParameterSymbol.HasValueTypeConstraint)
+        else if (typeParameterSymbol.HasValueTypeConstraint)
         {
             constraints.Add("struct");
         }
+        else if (typeParameterSymbol.HasReferenceTypeConstraint)
+        {
+            constraints.Add(
+                typeParameterSymbol.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated
+                    ? "class?"
+                    : "class"
+            );
+        }
+        else if (typeParameterSymbol.HasNotNullConstraint)
+        {
+            constraints.Add("notnull");
+        }
+
+        ITypeSymbol? baseTypeConstraint = null;
+        var interfaceConstraints = new List<ITypeSymbol>();
 
         foreach (var constraintType in typeParameterSymbol.ConstraintTypes)
         {
-            constraints.Add(constraintType.ToDisplayString(FullyQualifiedFormat));
+            if (constraintType.TypeKind == TypeKind.Class)
+            {
+                baseTypeConstraint ??= constraintType;
+            }
+            else
+            {
+                interfaceConstraints.Add(constraintType);
+            }
+        }
+
+        if (baseTypeConstraint != null)
+        {
+            constraints.Add(typeStringSelector(baseTypeConstraint));
+        }
+
+        foreach (var interfaceConstraint in interfaceConstraints)
+        {
+            constraints.Add(typeStringSelector(interfaceConstraint));
         }
 
         if (typeParameterSymbol.HasConstructorConstraint)
@@ -164,13 +191,8 @@ internal static class SymbolHelpers
             constraints.Add("new()");
         }
 
-        if (typeParameterSymbol.HasNotNullConstraint)
-        {
-            constraints.Add("notnull");
-        }
-
         return constraints.Count > 0
-            ? $"where {nameSelector(typeParameterSymbol.Name)} : {string.Join(", ", constraints)}"
+            ? $"where {typeParameterNameSelector(typeParameterSymbol)} : {string.Join(", ", constraints)}"
             : "";
     }
 
