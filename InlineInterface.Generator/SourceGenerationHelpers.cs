@@ -44,6 +44,7 @@ internal static class SourceGenerationHelpers
         var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
 
         var eventSymbols = interfaceContexts.SelectMany(ctx => ctx.EventSymbols).ToImmutableArray();
+        var propertySymbols = interfaceContexts.SelectMany(ctx => ctx.PropertySymbols).ToImmutableArray();
         var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
 
         var interfaceTypeStringProvider = new InterfaceTypeStringProvider(genericParameterMap);
@@ -57,9 +58,15 @@ internal static class SourceGenerationHelpers
         var eventContexts = eventContextProvider.Contexts.ToImmutableArray();
         var hasEventMembers = eventContexts.Any();
 
-        var propertyContexts = interfaceContexts
-            .SelectMany(ctx => CreatePropertyContexts(ctx.TypeSymbol, ctx.PropertySymbols, genericParameterMap, Indent, hasEventMembers))
-            .ToImmutableArray();
+        var propertyContextProvider = new PropertyContextProvider(
+            propertySymbols,
+            genericParameterMap,
+            interfaceTypeStringProvider,
+            globalTypeBuilder,
+            hasEventMembers,
+            Indent
+        );
+        var propertyContexts = propertyContextProvider.Contexts.ToImmutableArray();
 
         var methodContextProvider = new MethodContextProvider(
             methodSymbols,
@@ -68,9 +75,6 @@ internal static class SourceGenerationHelpers
             globalTypeBuilder,
             hasEventMembers
         );
-        var methodImplementations = methodSymbols
-            .Select(methodContextProvider.GetInterfaceImplementation)
-            .ToImmutableArray();
         var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
@@ -275,18 +279,18 @@ internal static class SourceGenerationHelpers
         }
 
         // impl property implementations
-        foreach (var propertyContext in propertyContexts)
+        foreach (var propertySymbol in propertySymbols)
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in propertyContext.Implementation)
+            foreach (var line in propertyContextProvider.GetInterfaceImplementation(propertySymbol))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
         }
 
         // impl method implementations
-        foreach (var methodImplementation in methodImplementations)
+        foreach (var methodImplementation in methodSymbols.Select(methodContextProvider.GetInterfaceImplementation))
         {
             stringBuilder.AppendLine();
             stringBuilder.AppendLine($"{depthSpacerText}{methodImplementation}");
