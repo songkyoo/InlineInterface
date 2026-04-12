@@ -1,13 +1,109 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-public sealed class MethodContextProvider(ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap, InterfaceTypeStringProvider interfaceTypeStringProvider, bool hasEventMembers)
+public sealed class MethodContextProvider(
+    IEnumerable<IMethodSymbol> methodSymbols,
+    ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
+    InterfaceTypeStringProvider interfaceTypeStringProvider,
+    string globalTypeBuilder,
+    bool hasEventMembers
+)
 {
     #region Static Methods
+    private static ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> CreateCache(
+        IEnumerable<IMethodSymbol> methodSymbols,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
+        string globalTypeBuilder,
+        bool hasEventMembers
+    )
+    {
+        var builder = new Dictionary<string, List<MethodContext>>();
+
+        foreach (var methodSymbol in methodSymbols)
+        {
+            var methodName = methodSymbol.Name;
+
+            if (!builder.TryGetValue(methodName, out var contexts))
+            {
+                contexts = [];
+                builder.Add(methodSymbol.Name, contexts);
+            }
+
+            if (contexts.Any(x => MatchesMethodSignature(methodSymbol, x.ReturnTypeSymbol, x.ParameterTypeSymbols)))
+            {
+                continue;
+            }
+
+            var uniqueName = $"Method_{methodName}_{contexts.Count}";
+            var parameterName = $"method_{methodName}_{contexts.Count}";
+            var fieldName = $"_{parameterName}";
+
+            var paramTypes = new List<string>();
+            var parameters = new List<string>();
+            var arguments = new List<string>();
+
+            if (hasEventMembers)
+            {
+                paramTypes.Add($"{globalTypeBuilder}.EventDispatcher");
+                arguments.Add("_eventDispatcher");
+            }
+
+            foreach (var paramSymbol in methodSymbol.Parameters)
+            {
+                var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
+
+                paramTypes.Add(type);
+                parameters.Add($"{type} {name}");
+                arguments.Add(name);
+            }
+
+            var paramTypeList = string.Join(", ", paramTypes);
+
+            string returnType;
+            string delegateType;
+
+            if (methodSymbol.ReturnsVoid)
+            {
+                returnType = "void";
+                delegateType = paramTypeList.Length > 0
+                    ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
+                    : $"global::System.Action";
+            }
+            else
+            {
+                returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
+                delegateType = paramTypeList.Length > 0
+                    ? $"global::System.Func<{paramTypeList}, {returnType}>"
+                    : $"global::System.Func<{returnType}>";
+            }
+
+            var newContext = new MethodContext(
+                ReturnTypeSymbol: methodSymbol.ReturnType,
+                ParameterTypeSymbols: methodSymbol.Parameters,
+                ReturnType: returnType,
+                Parameters: string.Join(", ", parameters),
+                Arguments: string.Join(", ", arguments),
+                DelegateType: delegateType,
+                Name: methodName,
+                UniqueName: uniqueName,
+                ParameterName: parameterName,
+                FieldName: fieldName
+            );
+
+            contexts.Add(newContext);
+        }
+
+        return builder.ToImmutableSortedDictionary(
+            keySelector: x => x.Key,
+            elementSelector: x => x.Value.ToImmutableArray()
+        );
+    }
+
     private static bool MatchesMethodSignature(
         IMethodSymbol methodSymbol,
         ITypeSymbol returnType,
@@ -52,7 +148,12 @@ public sealed class MethodContextProvider(ImmutableDictionary<ITypeParameterSymb
     #endregion
 
     #region Fields
-    private readonly Dictionary<string, List<MethodContext>> _cache = new();
+    private readonly ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> _cache = CreateCache(
+        methodSymbols,
+        genericParameterMap,
+        globalTypeBuilder,
+        hasEventMembers
+    );
     #endregion
 
     #region Properties
@@ -60,91 +161,52 @@ public sealed class MethodContextProvider(ImmutableDictionary<ITypeParameterSymb
     #endregion
 
     #region Methods
-    public string GetMethodImplementation(IMethodSymbol methodSymbol)
+    public string GetInterfaceImplementation(IMethodSymbol methodSymbol)
     {
-        var context = GetMethodContext(methodSymbol);
+        if (!TryGetMethodContext(methodSymbol, out var context))
+        {
+            return "";
+        }
+
         var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType);
 
         return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw new global::System.NotImplementedException())({context.Arguments});";
     }
 
-    private MethodContext GetMethodContext(IMethodSymbol methodSymbol)
+    private bool TryGetMethodContext(
+        IMethodSymbol methodSymbol,
+        [NotNullWhen(returnValue: true)]out MethodContext? context
+    )
     {
-        var methodName = methodSymbol.Name;
-
-        if (!_cache.TryGetValue(methodName, out var contexts))
+        if (!_cache.TryGetValue(methodSymbol.Name, out var contexts))
         {
-            contexts = [];
-            _cache.Add(methodSymbol.Name, contexts);
+            context = null;
+
+            return false;
         }
 
-        foreach (var context in contexts)
+        var index = -1;
+
+        for (var i = 0; i < contexts.Length; i++)
         {
-            if (MatchesMethodSignature(methodSymbol, context.ReturnTypeSymbol, context.ParameterTypeSymbols))
+            if (MatchesMethodSignature(methodSymbol, contexts[i].ReturnTypeSymbol, contexts[i].ParameterTypeSymbols))
             {
-                return context;
+                index = i;
+
+                break;
             }
         }
 
-        var uniqueName = $"Method_{methodName}_{contexts.Count}";
-        var parameterName = $"method_{methodName}_{contexts.Count}";
-        var fieldName = $"_{parameterName}";
-
-        var paramTypes = new List<string>();
-        var parameters = new List<string>();
-        var arguments = new List<string>();
-
-        if (hasEventMembers)
+        if (index == -1)
         {
-            paramTypes.Add("EventDispatcher");
-            arguments.Add("_eventDispatcher");
+            context = null;
+
+            return false;
         }
 
-        foreach (var paramSymbol in methodSymbol.Parameters)
-        {
-            var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
+        context = contexts[index];
 
-            paramTypes.Add(type);
-            parameters.Add($"{type} {name}");
-            arguments.Add(name);
-        }
-
-        var paramTypeList = string.Join(", ", paramTypes);
-
-        string returnType;
-        string delegateType;
-
-        if (methodSymbol.ReturnsVoid)
-        {
-            returnType = "void";
-            delegateType = paramTypeList.Length > 0
-                ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
-                : $"global::System.Action";
-        }
-        else
-        {
-            returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
-            delegateType = paramTypeList.Length > 0
-                ? $"global::System.Func<{paramTypeList}, {returnType}>"
-                : $"global::System.Func<{returnType}>";
-        }
-
-        var newContext = new MethodContext(
-            ReturnTypeSymbol: methodSymbol.ReturnType,
-            ParameterTypeSymbols: methodSymbol.Parameters,
-            ReturnType: returnType,
-            Parameters: string.Join(", ", parameters),
-            Arguments: string.Join(", ", arguments),
-            DelegateType: delegateType,
-            Name: methodName,
-            UniqueName: uniqueName,
-            ParameterName: parameterName,
-            FieldName: fieldName
-        );
-
-        contexts.Add(newContext);
-
-        return newContext;
+        return true;
     }
     #endregion
 }

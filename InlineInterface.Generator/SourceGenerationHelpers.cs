@@ -3,7 +3,6 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-using static System.Linq.Enumerable;
 using static Macaron.InlineInterface.SymbolHelpers;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -26,6 +25,24 @@ internal static class SourceGenerationHelpers
             genericParameterMap
         ) = GetTypeStrings(typeSymbol);
 
+
+        // get nested types
+        var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
+        var containingType = GetContainingType(typeSymbol);
+
+        while (containingType != null)
+        {
+            nestedTypeNames.Add(GetTypeName(containingType));
+            containingType = GetContainingType(containingType);
+        }
+
+        nestedTypeNames.Reverse();
+
+        var mergedTypePrefix = string.Join("_", nestedTypeNames);
+        var typeBuilderNamespace = $"Macaron.InlineInterface.Generated{GetNamespaceString(typeSymbol)}";
+        var typeBuilder = $"{mergedTypePrefix}Builder{genericParameters}";
+        var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
+
         var eventSymbols = interfaceContexts.SelectMany(ctx => ctx.EventSymbols).ToImmutableArray();
         var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
 
@@ -45,33 +62,19 @@ internal static class SourceGenerationHelpers
             .ToImmutableArray();
 
         var methodContextProvider = new MethodContextProvider(
+            methodSymbols,
             genericParameterMap,
             interfaceTypeStringProvider,
+            globalTypeBuilder,
             hasEventMembers
         );
         var methodImplementations = methodSymbols
-            .Select(methodContextProvider.GetMethodImplementation)
+            .Select(methodContextProvider.GetInterfaceImplementation)
             .ToImmutableArray();
         var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
-        var typeBuilderNamespace = $"Macaron.InlineInterface.Generated{GetNamespaceString(typeSymbol)}";
-
-        // get nested types
-        var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
-        var containingType = GetContainingType(typeSymbol);
-
-        while (containingType != null)
-        {
-            nestedTypeNames.Add(GetTypeName(containingType));
-            containingType = GetContainingType(containingType);
-        }
-
-        nestedTypeNames.Reverse();
-
-        var mergedTypePrefix = string.Join("_", nestedTypeNames);
-        var typeBuilder = $"{mergedTypePrefix}Builder{genericParameters}";
 
         // begin builder namespace
         stringBuilder.AppendLine($"namespace {typeBuilderNamespace}");
@@ -521,8 +524,6 @@ internal static class SourceGenerationHelpers
         depthSpacerText += Indent;
 
         // extension methods
-        var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
-
         foreach (var propertyContext in propertyContexts)
         {
             var parameters = new List<string>();
@@ -569,7 +570,7 @@ internal static class SourceGenerationHelpers
         {
             stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{(hasEventMembers ? methodContext.DelegateType.Replace("<EventDispatcher", $"<{globalTypeBuilder}.EventDispatcher") : methodContext.DelegateType)} impl)");
+            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.DelegateType} impl)");
 
             // constraints
             foreach (var constraint in genericParameterConstraints)

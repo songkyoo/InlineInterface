@@ -14,21 +14,21 @@ public sealed class EventContextProvider(
 )
 {
     #region Static Methods
-    private static Dictionary<string, List<EventContext>> CreateCache(
+    private static ImmutableSortedDictionary<string, ImmutableArray<EventContext>> CreateCache(
         IEnumerable<IEventSymbol> eventSymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
     {
-        var cache = new Dictionary<string, List<EventContext>>();
+        var builder = new Dictionary<string, List<EventContext>>();
 
         foreach (var eventSymbol in eventSymbols)
         {
             var eventName = eventSymbol.Name;
 
-            if (!cache.TryGetValue(eventName, out var contexts))
+            if (!builder.TryGetValue(eventName, out var contexts))
             {
                 contexts = [];
-                cache.Add(eventSymbol.Name, contexts);
+                builder.Add(eventSymbol.Name, contexts);
             }
 
             if (eventSymbol.Type is not INamedTypeSymbol typeSymbol)
@@ -63,12 +63,18 @@ public sealed class EventContextProvider(
             contexts.Add(newContext);
         }
 
-        return cache;
+        return builder.ToImmutableSortedDictionary(
+            keySelector: x => x.Key,
+            elementSelector: x => x.Value.ToImmutableArray()
+        );
     }
     #endregion
 
     #region Fields
-    private readonly Dictionary<string, List<EventContext>> _cache = CreateCache(eventSymbols, genericParameterMap);
+    private readonly ImmutableSortedDictionary<string, ImmutableArray<EventContext>> _cache = CreateCache(
+        eventSymbols,
+        genericParameterMap
+    );
     #endregion
 
     #region Properties
@@ -153,7 +159,17 @@ public sealed class EventContextProvider(
             return false;
         }
 
-        var index = contexts.FindIndex(x => SymbolEqualityComparer.Default.Equals(x.TypeSymbol, eventSymbol.Type));
+        var index = -1;
+
+        for (var i = 0; i < contexts.Length; i++)
+        {
+            if (SymbolEqualityComparer.Default.Equals(contexts[i].TypeSymbol, eventSymbol.Type))
+            {
+                index = i;
+
+                break;
+            }
+        }
 
         if (index == -1)
         {

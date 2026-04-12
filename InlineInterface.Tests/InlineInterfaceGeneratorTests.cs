@@ -353,11 +353,11 @@ public class InlineInterfaceGeneratorTests
                         private readonly EventCollection _eventCollection = new();
                         private readonly EventDispatcher _eventDispatcher;
                         private readonly global::System.Func<EventCollection, string>? _getLastName;
-                        private readonly global::System.Action<EventDispatcher, string>? _method_SetName_0;
+                        private readonly global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventDispatcher, string>? _method_SetName_0;
 
                         public Impl(
                             global::System.Func<EventCollection, string>? getLastName,
-                            global::System.Action<EventDispatcher, string>? method_SetName_0)
+                            global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventDispatcher, string>? method_SetName_0)
                         {
                             _eventDispatcher = new EventDispatcher(_eventCollection);
                             _getLastName = getLastName;
@@ -382,12 +382,12 @@ public class InlineInterfaceGeneratorTests
 
                     private readonly global::System.Func<EventCollection, string>? GetLastName { get; init; } = null;
 
-                    private readonly global::System.Action<EventDispatcher, string>? Method_SetName_0 { get; init; } = null;
+                    private readonly global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventDispatcher, string>? Method_SetName_0 { get; init; } = null;
 
                     public Parent_1_IPerson_1Builder(
                         bool allowMissingImplementation,
                         global::System.Func<EventCollection, string>? getLastName = null,
-                        global::System.Action<EventDispatcher, string>? method_SetName_0 = null)
+                        global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventDispatcher, string>? method_SetName_0 = null)
                     {
                         _allowMissingImplementation = allowMissingImplementation;
 
@@ -397,7 +397,7 @@ public class InlineInterfaceGeneratorTests
 
                     public Parent_1_IPerson_1Builder<T0, T1> LastName(global::System.Func<EventCollection, string> getter) => this with { GetLastName = getter };
 
-                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<EventDispatcher, string> impl) => this with { Method_SetName_0 = impl };
+                    public Parent_1_IPerson_1Builder<T0, T1> SetName(global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Parent_1_IPerson_1Builder<T0, T1>.EventDispatcher, string> impl) => this with { Method_SetName_0 = impl };
 
                     public global::Macaron.InlineInterface.Tests.Parent<T0>.IPerson<T1> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
@@ -503,9 +503,9 @@ public class InlineInterfaceGeneratorTests
                 {
                     public sealed class EventCollection
                     {
-                        public global::System.Action<string, int>? ValueChanged_0;
                         public global::System.Func<T1?>? NameChanged_0;
                         public global::System.Action? NameChanged_1;
+                        public global::System.Action<string, int>? ValueChanged_0;
                     }
 
                     public sealed class EventDispatcher
@@ -540,22 +540,22 @@ public class InlineInterfaceGeneratorTests
                     {
                         private readonly EventCollection _eventCollection = new();
                         private readonly EventDispatcher _eventDispatcher;
-                        private readonly global::System.Func<EventDispatcher, string>? _method_GetLastName_0;
-                        private readonly global::System.Func<EventDispatcher, int, string>? _method_GetLastName_1;
-                        private readonly global::System.Action<EventDispatcher, string>? _method_SetName_0;
-                        private readonly global::System.Func<EventDispatcher, string>? _method_GetFirstName_0;
+                        private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? _method_GetFirstName_0;
+                        private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? _method_GetLastName_0;
+                        private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, int, string>? _method_GetLastName_1;
+                        private readonly global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? _method_SetName_0;
 
                         public Impl(
-                            global::System.Func<EventDispatcher, string>? method_GetLastName_0,
-                            global::System.Func<EventDispatcher, int, string>? method_GetLastName_1,
-                            global::System.Action<EventDispatcher, string>? method_SetName_0,
-                            global::System.Func<EventDispatcher, string>? method_GetFirstName_0)
+                            global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_GetFirstName_0,
+                            global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_GetLastName_0,
+                            global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, int, string>? method_GetLastName_1,
+                            global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_SetName_0)
                         {
                             _eventDispatcher = new EventDispatcher(_eventCollection);
+                            _method_GetFirstName_0 = method_GetFirstName_0;
                             _method_GetLastName_0 = method_GetLastName_0;
                             _method_GetLastName_1 = method_GetLastName_1;
                             _method_SetName_0 = method_SetName_0;
-                            _method_GetFirstName_0 = method_GetFirstName_0;
                         }
 
                         event global::System.Action<string, int>? global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>.ValueChanged
@@ -589,44 +589,44 @@ public class InlineInterfaceGeneratorTests
 
                     private readonly bool _allowMissingImplementation;
 
-                    private readonly global::System.Func<EventDispatcher, string>? Method_GetLastName_0 { get; init; } = null;
+                    private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? Method_GetFirstName_0 { get; init; } = null;
 
-                    private readonly global::System.Func<EventDispatcher, int, string>? Method_GetLastName_1 { get; init; } = null;
+                    private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? Method_GetLastName_0 { get; init; } = null;
 
-                    private readonly global::System.Action<EventDispatcher, string>? Method_SetName_0 { get; init; } = null;
+                    private readonly global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, int, string>? Method_GetLastName_1 { get; init; } = null;
 
-                    private readonly global::System.Func<EventDispatcher, string>? Method_GetFirstName_0 { get; init; } = null;
+                    private readonly global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? Method_SetName_0 { get; init; } = null;
 
                     public Foo_1_IFooBar_2Builder(
                         bool allowMissingImplementation,
-                        global::System.Func<EventDispatcher, string>? method_GetLastName_0 = null,
-                        global::System.Func<EventDispatcher, int, string>? method_GetLastName_1 = null,
-                        global::System.Action<EventDispatcher, string>? method_SetName_0 = null,
-                        global::System.Func<EventDispatcher, string>? method_GetFirstName_0 = null)
+                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_GetFirstName_0 = null,
+                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_GetLastName_0 = null,
+                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, int, string>? method_GetLastName_1 = null,
+                        global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string>? method_SetName_0 = null)
                     {
                         _allowMissingImplementation = allowMissingImplementation;
 
+                        Method_GetFirstName_0 = method_GetFirstName_0;
                         Method_GetLastName_0 = method_GetLastName_0;
                         Method_GetLastName_1 = method_GetLastName_1;
                         Method_SetName_0 = method_SetName_0;
-                        Method_GetFirstName_0 = method_GetFirstName_0;
                     }
 
-                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<EventDispatcher, string> impl) => this with { Method_GetLastName_0 = impl };
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName(global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl) => this with { Method_GetFirstName_0 = impl };
 
-                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<EventDispatcher, int, string> impl) => this with { Method_GetLastName_1 = impl };
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl) => this with { Method_GetLastName_0 = impl };
 
-                    public Foo_1_IFooBar_2Builder<T0, T1, T2> SetName(global::System.Action<EventDispatcher, string> impl) => this with { Method_SetName_0 = impl };
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName(global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, int, string> impl) => this with { Method_GetLastName_1 = impl };
 
-                    public Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName(global::System.Func<EventDispatcher, string> impl) => this with { Method_GetFirstName_0 = impl };
+                    public Foo_1_IFooBar_2Builder<T0, T1, T2> SetName(global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl) => this with { Method_SetName_0 = impl };
 
                     public global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2> Build(global::Macaron.InlineInterface.Tag _ = default)
                     {
                         return new Impl(
+                            method_GetFirstName_0: Method_GetFirstName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
                             method_GetLastName_0: Method_GetLastName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
                             method_GetLastName_1: Method_GetLastName_1 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            method_SetName_0: Method_SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()),
-                            method_GetFirstName_0: Method_GetFirstName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
+                            method_SetName_0: Method_SetName_0 ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException()));
                     }
                 }
             }
@@ -635,6 +635,13 @@ public class InlineInterfaceGeneratorTests
             {
                 internal static partial class ImplementationOfExtensions
                 {
+                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName<T0, T1, T2>(
+                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
+                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl)
+                    {
+                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_GetFirstName_0: impl);
+                    }
+
                     public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetLastName<T0, T1, T2>(
                         this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
                         global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl)
@@ -654,13 +661,6 @@ public class InlineInterfaceGeneratorTests
                         global::System.Action<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl)
                     {
                         return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_SetName_0: impl);
-                    }
-
-                    public static global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2> GetFirstName<T0, T1, T2>(
-                        this global::Macaron.InlineInterface.ImplementationOf<global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2>> implementationOf,
-                        global::System.Func<global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>.EventDispatcher, string> impl)
-                    {
-                        return new global::Macaron.InlineInterface.Generated.Macaron.InlineInterface.Tests.Foo_1_IFooBar_2Builder<T0, T1, T2>(allowMissingImplementation: implementationOf.AllowMissingImplementation, method_GetFirstName_0: impl);
                     }
 
                     public static global::Macaron.InlineInterface.Tests.Foo<T0>.IFooBar<T1, T2> Build<T0, T1, T2>(
