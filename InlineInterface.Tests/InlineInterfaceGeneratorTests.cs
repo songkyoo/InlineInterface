@@ -364,10 +364,9 @@ public class InlineInterfaceGeneratorTests
                             _eventCollection = eventCollection;
                         }
 
-                        public string? InvokeNameChanged(global::Macaron.InlineInterface.Tests.Foo? arg)
+                        public void NameChanged(global::Macaron.InlineInterface.Tests.Foo? arg, out string? @return)
                         {
-                            if (_eventCollection.NameChanged_0 == null) return default;
-                            return _eventCollection.NameChanged_0(arg);
+                            @return = _eventCollection.NameChanged_0 != null ? _eventCollection.NameChanged_0(arg) : default;
                         }
                     }
 
@@ -620,22 +619,19 @@ public class InlineInterfaceGeneratorTests
                             _eventCollection = eventCollection;
                         }
 
-                        public T1? InvokeNameChanged()
+                        public void NameChanged(out T1? @return)
                         {
-                            if (_eventCollection.NameChanged_0 == null) return default;
-                            return _eventCollection.NameChanged_0();
+                            @return = _eventCollection.NameChanged_0 != null ? _eventCollection.NameChanged_0() : default;
                         }
 
-                        public void RaiseNameChanged()
+                        public void NameChanged()
                         {
-                            if (_eventCollection.NameChanged_1 == null) return;
-                            _eventCollection.NameChanged_1();
+                            if (_eventCollection.NameChanged_1 != null) _eventCollection.NameChanged_1();
                         }
 
-                        public void RaiseValueChanged(string arg1, int arg2)
+                        public void ValueChanged(string arg1, int arg2)
                         {
-                            if (_eventCollection.ValueChanged_0 == null) return;
-                            _eventCollection.ValueChanged_0(arg1, arg2);
+                            if (_eventCollection.ValueChanged_0 != null) _eventCollection.ValueChanged_0(arg1, arg2);
                         }
                     }
 
@@ -1028,10 +1024,9 @@ public class InlineInterfaceGeneratorTests
                             _eventCollection = eventCollection;
                         }
 
-                        public void RaiseChanged()
+                        public void Changed()
                         {
-                            if (_eventCollection.Changed_0 == null) return;
-                            _eventCollection.Changed_0();
+                            if (_eventCollection.Changed_0 != null) _eventCollection.Changed_0();
                         }
                     }
 

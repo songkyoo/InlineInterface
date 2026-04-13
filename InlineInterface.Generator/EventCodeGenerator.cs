@@ -31,24 +31,6 @@ public sealed class EventCodeGenerator(
                 continue;
             }
 
-            string returnString;
-
-            if (methodSymbol.ReturnsVoid)
-            {
-                returnString = "void Raise";
-            }
-            else
-            {
-                var returnTypeString = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
-
-                if (!returnTypeString.EndsWith("?"))
-                {
-                    returnTypeString += "?";
-                }
-
-                returnString = $"{returnTypeString} Invoke";
-            }
-
             var parameters = new List<string>();
             var arguments = new List<string>();
 
@@ -60,12 +42,34 @@ public sealed class EventCodeGenerator(
                 arguments.Add(name);
             }
 
+            if (!methodSymbol.ReturnsVoid)
+            {
+                var returnTypeString = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
+
+                if (!returnTypeString.EndsWith("?"))
+                {
+                    returnTypeString += "?";
+                }
+
+                parameters.Add($"out {returnTypeString} @return");
+            }
+
             var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
-            implementationBuilder.Add($"public {returnString}{context.Name}({string.Join(", ", parameters)})");
+            implementationBuilder.Add($"public void {context.Name}({string.Join(", ", parameters)})");
             implementationBuilder.Add("{");
-            implementationBuilder.Add($"{indent}if (_eventCollection.{context.UniqueName} == null) return{(methodSymbol.ReturnsVoid ? "" : " default")};");
-            implementationBuilder.Add($"{indent}{(methodSymbol.ReturnsVoid ? "" : "return ")}_eventCollection.{context.UniqueName}({string.Join(", ", arguments)});");
+
+            var expression = $"_eventCollection.{context.UniqueName}({string.Join(", ", arguments)})";
+
+            if (methodSymbol.ReturnsVoid)
+            {
+                implementationBuilder.Add($"{indent}if (_eventCollection.{context.UniqueName} != null) {expression};");
+            }
+            else
+            {
+                implementationBuilder.Add($"{indent}@return = _eventCollection.{context.UniqueName} != null ? {expression} : default;");
+            }
+
             implementationBuilder.Add("}");
 
             yield return implementationBuilder.ToImmutable();
