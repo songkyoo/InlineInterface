@@ -443,7 +443,7 @@ internal static class SourceGenerationHelpers
                 expressions.Add($"{setterName} = setter");
             }
 
-            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {propertyContext.Name}({string.Join(", ", parameters)}) => this with {{ {string.Join(", ", expressions)} }};");
+            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {propertyContext.ApiName}({string.Join(", ", parameters)}) => this with {{ {string.Join(", ", expressions)} }};");
             stringBuilder.AppendLine();
         }
 
@@ -539,7 +539,7 @@ internal static class SourceGenerationHelpers
                 GetterParameterName: { } getterParameterName,
             })
             {
-                parameters.Add($"{(hasEventMembers ? getterDelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : getterDelegateType)} getter");
+                parameters.Add($"{getterDelegateType} getter");
                 expressions.Add($"{getterParameterName}: getter");
             }
 
@@ -549,11 +549,11 @@ internal static class SourceGenerationHelpers
                 SetterParameterName: { } setterParameterName,
             })
             {
-                parameters.Add($"{(hasEventMembers ? setterDelegateType.Replace("<EventCollection", $"<{globalTypeBuilder}.EventCollection") : setterDelegateType)} setter");
+                parameters.Add($"{setterDelegateType} setter");
                 expressions.Add($"{setterParameterName}: setter");
             }
 
-            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {propertyContext.Name}{genericParameters}(");
+            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {propertyContext.ApiName}{genericParameters}(");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}{string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", parameters)})");
 

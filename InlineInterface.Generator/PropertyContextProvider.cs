@@ -153,6 +153,10 @@ public sealed class PropertyContextProvider(
     {
         var propertyType = SymbolHelpers.GetTypeString(propertySymbol.Type, genericParameterMap);
 
+        var isIndexer = propertySymbol.IsIndexer;
+        var apiName = isIndexer ? "Indexer" : propertySymbol.Name;
+        var uniqueName = isIndexer ? $"Indexer_{uniqueIndex}" : $"{propertySymbol.Name}_{uniqueIndex}";
+
         var parameters = new List<string>();
         var arguments = new List<string>();
         var delegateParameterTypes = new List<string>();
@@ -186,8 +190,8 @@ public sealed class PropertyContextProvider(
 
         if (propertySymbol.GetMethod != null)
         {
-            getterName = $"Property_Get_{propertySymbol.Name}_{uniqueIndex}";
-            getterParameterName = $"property_get_{propertySymbol.Name}_{uniqueIndex}";
+            getterName = $"Property_Get_{uniqueName}";
+            getterParameterName = $"property_get_{uniqueName}";
             getterFieldName = $"_{getterParameterName}";
 
             getterDelegateType = delegateParameterTypes.Count > 0
@@ -204,8 +208,8 @@ public sealed class PropertyContextProvider(
 
         if (propertySymbol.SetMethod != null)
         {
-            setterName = $"Property_Set_{propertySymbol.Name}_{uniqueIndex}";
-            setterParameterName = $"property_set_{propertySymbol.Name}_{uniqueIndex}";
+            setterName = $"Property_Set_{uniqueName}";
+            setterParameterName = $"property_set_{uniqueName}";
             setterFieldName = $"_{setterParameterName}";
 
             var setterDelegateParameterTypes = delegateParameterTypes
@@ -227,8 +231,10 @@ public sealed class PropertyContextProvider(
         return new PropertyContext(
             TypeSymbol: propertySymbol.Type,
             ParameterSymbols: propertySymbol.Parameters,
+            IsIndexer: isIndexer,
             Type: propertyType,
             Name: propertySymbol.Name,
+            ApiName: apiName,
             Parameters: parameterList,
             Arguments: argumentList,
             RequiresGetter: propertySymbol.GetMethod != null,
@@ -269,8 +275,8 @@ public sealed class PropertyContextProvider(
         var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType);
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
-        var propertyName = propertySymbol.IsIndexer ? "this" : propertySymbol.Name;
-        var parameterList = propertySymbol.Parameters.Length > 0
+        var propertyName = context.IsIndexer ? "this" : context.Name;
+        var parameterList = context.Parameters.Length > 0
             ? $"[{context.Parameters}]"
             : "";
 

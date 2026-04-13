@@ -6,8 +6,10 @@ namespace Macaron.InlineInterface;
 public sealed record PropertyContext(
     ITypeSymbol TypeSymbol,
     ImmutableArray<IParameterSymbol> ParameterSymbols,
+    bool IsIndexer,
     string Type,
     string Name,
+    string ApiName,
     string Parameters,
     string Arguments,
     bool RequiresGetter,
@@ -21,4 +23,3 @@ public sealed record PropertyContext(
     string? GetterFieldName,
     string? SetterFieldName
 );
-
