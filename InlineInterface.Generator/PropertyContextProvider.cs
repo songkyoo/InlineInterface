@@ -214,9 +214,7 @@ public sealed class PropertyContextProvider(
                 .Concat([propertyType])
                 .ToArray();
 
-            setterDelegateType = setterDelegateParameterTypes.Length > 0
-                ? $"global::System.Action<{string.Join(", ", setterDelegateParameterTypes)}>"
-                : $"global::System.Action";
+            setterDelegateType = $"global::System.Action<{string.Join(", ", setterDelegateParameterTypes)}>";
         }
         else
         {

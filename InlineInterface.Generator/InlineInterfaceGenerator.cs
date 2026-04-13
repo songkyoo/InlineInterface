@@ -379,10 +379,10 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             else
             {
                 return new InterfaceContextOrDiagnostics(interfaceContext: new InterfaceContext(
-                        TypeSymbol: interfaceSymbol,
-                        EventSymbols: eventSymbolsBuilder.ToImmutable(),
-                        PropertySymbols: propertySymbolsBuilder.ToImmutable(),
-                        MethodSymbols: methodSymbolsBuilder.ToImmutable()
+                    TypeSymbol: interfaceSymbol,
+                    EventSymbols: eventSymbolsBuilder.ToImmutable(),
+                    PropertySymbols: propertySymbolsBuilder.ToImmutable(),
+                    MethodSymbols: methodSymbolsBuilder.ToImmutable()
                 ));
             }
         }

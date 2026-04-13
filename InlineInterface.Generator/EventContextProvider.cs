@@ -44,7 +44,7 @@ public sealed class EventContextProvider(
 
             var type = SymbolHelpers.GetTypeString(typeSymbol, genericParameterMap);
 
-            if (eventSymbol.NullableAnnotation != NullableAnnotation.Annotated)
+            if (!type.EndsWith("?"))
             {
                 type += "?";
             }

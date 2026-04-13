@@ -539,7 +539,7 @@ internal static class SourceGenerationHelpers
 
     private static string GetHintName(INamedTypeSymbol typeSymbol)
     {
-        var assemblyName = typeSymbol.ContainingAssembly != null ? $"{typeSymbol.ContainingAssembly}," : "";
+        var assemblyName = typeSymbol.ContainingAssembly != null ? $"{typeSymbol.ContainingAssembly}" : "";
         var qualifiedName = typeSymbol.ToDisplayString(FullyQualifiedFormat);
 
         const uint fnvPrime = 16777619;
