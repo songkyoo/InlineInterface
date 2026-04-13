@@ -9,10 +9,8 @@ namespace Macaron.InlineInterface;
 public sealed class PropertyContextProvider(
     IEnumerable<IPropertySymbol> propertySymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
-    InterfaceTypeStringProvider interfaceTypeStringProvider,
     string globalTypeBuilder,
-    bool hasEventMembers,
-    string indent
+    bool hasEventMembers
 )
 {
     #region Static Methods
@@ -265,46 +263,7 @@ public sealed class PropertyContextProvider(
     #endregion
 
     #region Methods
-    public ImmutableArray<string> GetInterfaceImplementation(IPropertySymbol propertySymbol)
-    {
-        if (!TryGetPropertyContext(propertySymbol, out var context))
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType);
-        var implementationBuilder = ImmutableArray.CreateBuilder<string>();
-
-        var propertyName = context.IsIndexer ? "this" : context.Name;
-        var parameterList = context.Parameters.Length > 0
-            ? $"[{context.Parameters}]"
-            : "";
-
-        implementationBuilder.Add($"{context.Type} {interfaceTypeString}.{propertyName}{parameterList}");
-        implementationBuilder.Add("{");
-
-        if (propertySymbol.GetMethod != null)
-        {
-            var getterArguments = context.Arguments;
-
-            implementationBuilder.Add($"{indent}get => ({context.GetterFieldName} ?? throw new global::System.NotImplementedException())({getterArguments});");
-        }
-
-        if (propertySymbol.SetMethod != null)
-        {
-            var setterArguments = string.IsNullOrEmpty(context.Arguments)
-                ? "value"
-                : $"{context.Arguments}, value";
-
-            implementationBuilder.Add($"{indent}set => ({context.SetterFieldName} ?? throw new global::System.NotImplementedException())({setterArguments});");
-        }
-
-        implementationBuilder.Add("}");
-
-        return implementationBuilder.ToImmutable();
-    }
-
-    private bool TryGetPropertyContext(
+    public bool TryGetPropertyContext(
         IPropertySymbol propertySymbol,
         [NotNullWhen(returnValue: true)] out PropertyContext? context
     )

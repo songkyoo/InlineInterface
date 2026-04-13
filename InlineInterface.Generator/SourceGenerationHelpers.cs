@@ -61,12 +61,14 @@ internal static class SourceGenerationHelpers
         var propertyContextProvider = new PropertyContextProvider(
             propertySymbols,
             genericParameterMap,
-            interfaceTypeStringProvider,
             globalTypeBuilder,
-            hasEventMembers,
+            hasEventMembers
+        );
+        var propertyCodeGenerator = new PropertyCodeGenerator(
+            propertyContextProvider,
+            interfaceTypeStringProvider,
             Indent
         );
-        var propertyContexts = propertyContextProvider.Contexts.ToImmutableArray();
 
         var methodContextProvider = new MethodContextProvider(
             methodSymbols,
@@ -158,25 +160,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}private readonly EventDispatcher _eventDispatcher;");
         }
 
-        foreach (var propertyContext in propertyContexts)
+        foreach (var line in propertyCodeGenerator.GetImplFieldDeclarations())
         {
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterFieldName: { } getterFieldName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}private readonly {getterDelegateType}? {getterFieldName};");
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterFieldName: { } setterFieldName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}private readonly {setterDelegateType}? {setterFieldName};");
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         foreach (var methodContext in methodContexts)
@@ -191,26 +177,7 @@ internal static class SourceGenerationHelpers
 
         var implConstructorParams = new List<string>();
 
-        foreach (var propertyContext in propertyContexts)
-        {
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                implConstructorParams.Add($"{getterDelegateType}? {getterParameterName}");
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                implConstructorParams.Add($"{setterDelegateType}? {setterParameterName}");
-            }
-        }
+        implConstructorParams.AddRange(propertyCodeGenerator.GetImplConstructorParameterFragments());
 
         foreach (var methodContext in methodContexts)
         {
@@ -236,25 +203,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}_eventDispatcher = new EventDispatcher(_eventCollection);");
         }
 
-        foreach (var propertyContext in propertyContexts)
+        foreach (var line in propertyCodeGenerator.GetImplConstructorAssignments())
         {
-            if (propertyContext is
-            {
-                GetterFieldName: { } getterFieldName,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{getterFieldName} = {getterParameterName};");
-            }
-
-            if (propertyContext is
-            {
-                SetterFieldName: { } setterFieldName,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{setterFieldName} = {setterParameterName};");
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         foreach (var methodContext in methodContexts)
@@ -283,7 +234,7 @@ internal static class SourceGenerationHelpers
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in propertyContextProvider.GetInterfaceImplementation(propertySymbol))
+            foreach (var line in propertyCodeGenerator.GetInterfaceImplementation(propertySymbol))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
@@ -306,27 +257,10 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}private readonly bool _allowMissingImplementation;");
         stringBuilder.AppendLine();
 
-        foreach (var propertyContext in propertyContexts)
+        foreach (var line in propertyCodeGenerator.GetBuilderFieldDeclarations())
         {
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterName: { } getterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}private readonly {getterDelegateType}? {getterName} {{ get; init; }} = null;");
-                stringBuilder.AppendLine();
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterName: { } setterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}private readonly {setterDelegateType}? {setterName} {{ get; init; }} = null;");
-                stringBuilder.AppendLine();
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
+            stringBuilder.AppendLine();
         }
 
         foreach (var methodContext in methodContexts)
@@ -342,26 +276,7 @@ internal static class SourceGenerationHelpers
 
         var builderConstructorParams = new List<string>();
 
-        foreach (var propertyContext in propertyContexts)
-        {
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                builderConstructorParams.Add($"{getterDelegateType}? {getterParameterName} = null");
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                builderConstructorParams.Add($"{setterDelegateType}? {setterParameterName} = null");
-            }
-        }
+        builderConstructorParams.AddRange(propertyCodeGenerator.GetBuilderConstructorParameterFragments());
 
         foreach (var methodContext in methodContexts)
         {
@@ -385,25 +300,9 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}_allowMissingImplementation = allowMissingImplementation;");
         stringBuilder.AppendLine();
 
-        foreach (var propertyContext in propertyContexts)
+        foreach (var line in propertyCodeGenerator.GetBuilderConstructorAssignments())
         {
-            if (propertyContext is
-            {
-                GetterName: { } getterName,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{getterName} = {getterParameterName};");
-            }
-
-            if (propertyContext is
-            {
-                SetterName: { } setterName,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{setterName} = {setterParameterName};");
-            }
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         foreach (var methodContext in methodContexts)
@@ -418,32 +317,9 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
 
         // builder methods
-        foreach (var propertyContext in propertyContexts)
+        foreach (var line in propertyCodeGenerator.GetBuilderMethodImplementation(typeBuilder))
         {
-            var parameters = new List<string>();
-            var expressions = new List<string>();
-
-            if (propertyContext is
-            {
-                GetterDelegateType: { } getterDelegateType,
-                GetterName: { } getterName,
-            })
-            {
-                parameters.Add($"{getterDelegateType} getter");
-                expressions.Add($"{getterName} = getter");
-            }
-
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterName: { } setterName,
-            })
-            {
-                parameters.Add($"{setterDelegateType} setter");
-                expressions.Add($"{setterName} = setter");
-            }
-
-            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {propertyContext.ApiName}({string.Join(", ", parameters)}) => this with {{ {string.Join(", ", expressions)} }};");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
             stringBuilder.AppendLine();
         }
 
@@ -463,26 +339,7 @@ internal static class SourceGenerationHelpers
 
         var implConstructorArgs = new List<string>();
 
-        foreach (var propertyContext in propertyContexts)
-        {
-            if (propertyContext is
-            {
-                GetterName: { } getterName,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                implConstructorArgs.Add($"{getterParameterName}: {getterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
-            }
-
-            if (propertyContext is
-            {
-                SetterName: { } setterName,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                implConstructorArgs.Add($"{setterParameterName}: {setterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
-            }
-        }
+        implConstructorArgs.AddRange(propertyCodeGenerator.GetBuildArgumentFragments());
 
         foreach (var methodContext in methodContexts)
         {
@@ -528,45 +385,18 @@ internal static class SourceGenerationHelpers
         depthSpacerText += Indent;
 
         // extension methods
-        foreach (var propertyContext in propertyContexts)
+        foreach (var lines in propertyCodeGenerator.GetExtensionMethodImplementation(
+            type,
+            globalTypeBuilder,
+            genericParameters,
+            genericParameterConstraints
+        ))
         {
-            var parameters = new List<string>();
-            var expressions = new List<string>();
-
-            if (propertyContext is
+            foreach (var line in lines)
             {
-                GetterDelegateType: { } getterDelegateType,
-                GetterParameterName: { } getterParameterName,
-            })
-            {
-                parameters.Add($"{getterDelegateType} getter");
-                expressions.Add($"{getterParameterName}: getter");
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
 
-            if (propertyContext is
-            {
-                SetterDelegateType: { } setterDelegateType,
-                SetterParameterName: { } setterParameterName,
-            })
-            {
-                parameters.Add($"{setterDelegateType} setter");
-                expressions.Add($"{setterParameterName}: setter");
-            }
-
-            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {propertyContext.ApiName}{genericParameters}(");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{string.Join($",{Environment.NewLine}{depthSpacerText}{Indent}", parameters)})");
-
-            // constraints
-            foreach (var constraint in genericParameterConstraints)
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
-            }
-
-            // method body
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(allowMissingImplementation: implementationOf.AllowMissingImplementation, {string.Join(", ", expressions)});");
-            stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
 
