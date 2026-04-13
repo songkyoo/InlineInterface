@@ -107,15 +107,13 @@ internal static class SymbolHelpers
         {
             case INamedTypeSymbol namedTypeSymbol:
             {
-                var specialTypeKeyword = GetSpecialTypeKeyword(namedTypeSymbol);
-
-                typeString = specialTypeKeyword ?? GetNamedTypeString(namedTypeSymbol, genericParameterMap);
+                typeString = GetNamedTypeString(namedTypeSymbol, genericParameterMap);
 
                 break;
             }
             case ITypeParameterSymbol typeParameterSymbol:
             {
-                typeString =  genericParameterMap.TryGetValue(typeParameterSymbol, out var mapped)
+                typeString = genericParameterMap.TryGetValue(typeParameterSymbol, out var mapped)
                     ? mapped
                     : typeParameterSymbol.Name;
 
@@ -153,8 +151,29 @@ internal static class SymbolHelpers
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
     {
+        if (GetSpecialTypeKeyword(typeSymbol) is { } keyword)
+        {
+            return keyword;
+        }
+
+        if (typeSymbol.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            return GetTypeString(typeSymbol.TypeArguments[0], genericParameterMap) + "?";
+        }
+
+        return GetFullyQualifiedNamedTypeString(typeSymbol, genericParameterMap);
+    }
+
+    private static string GetFullyQualifiedNamedTypeString(
+        INamedTypeSymbol typeSymbol,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
+    )
+    {
         var typeSymbols = GetNestedTypeSymbols(typeSymbol);
-        var @namespace = typeSymbol.ContainingNamespace is { IsGlobalNamespace: false } containingNamespace
+        var @namespace = typeSymbol.ContainingNamespace is
+        {
+            IsGlobalNamespace: false
+        } containingNamespace
             ? containingNamespace.ToDisplayString()
             : "";
         var types = new List<string>();
