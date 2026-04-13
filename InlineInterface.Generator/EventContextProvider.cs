@@ -2,15 +2,11 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
-using static Macaron.InlineInterface.ParameterStringHelpers;
-
 namespace Macaron.InlineInterface;
 
 public sealed class EventContextProvider(
     IEnumerable<IEventSymbol> eventSymbols,
-    ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
-    InterfaceTypeStringProvider interfaceTypeStringProvider,
-    string indent
+    ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
 )
 {
     #region Static Methods
@@ -82,75 +78,7 @@ public sealed class EventContextProvider(
     #endregion
 
     #region Methods
-    public ImmutableArray<string> GetEventDispatcherImplementation(IEventSymbol eventSymbol)
-    {
-        if (!TryGetEventContext(eventSymbol, out var context))
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        var methodSymbol = context.TypeSymbol.DelegateInvokeMethod!;
-
-        string returnString;
-
-        if (methodSymbol.ReturnsVoid)
-        {
-            returnString = "void Raise";
-        }
-        else
-        {
-            var returnTypeString = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
-
-            if (!returnTypeString.EndsWith("?"))
-            {
-                returnTypeString += "?";
-            }
-
-            returnString = $"{returnTypeString} Invoke";
-        }
-
-        var parameters = new List<string>();
-        var arguments = new List<string>();
-
-        foreach (var paramSymbol in methodSymbol.Parameters)
-        {
-            var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
-
-            parameters.Add($"{type} {name}");
-            arguments.Add(name);
-        }
-
-        var implementationBuilder = ImmutableArray.CreateBuilder<string>();
-
-        implementationBuilder.Add($"public {returnString}{context.Name}({string.Join(", ", parameters)})");
-        implementationBuilder.Add($"{{");
-        implementationBuilder.Add($"{indent}if (_eventCollection.{context.UniqueName} == null) return{(methodSymbol.ReturnsVoid ? "" : " default")};");
-        implementationBuilder.Add($"{indent}{(methodSymbol.ReturnsVoid ? "" : "return ")}_eventCollection.{context.UniqueName}({string.Join(", ", arguments)});");
-        implementationBuilder.Add($"}}");
-
-        return implementationBuilder.ToImmutable();
-    }
-
-    public ImmutableArray<string> GetInterfaceImplementation(IEventSymbol eventSymbol)
-    {
-        if (!TryGetEventContext(eventSymbol, out var context))
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(eventSymbol.ContainingType);
-        var implementationBuilder = ImmutableArray.CreateBuilder<string>();
-
-        implementationBuilder.Add($"event {context.Type} {interfaceTypeString}.{context.Name}");
-        implementationBuilder.Add($"{{");
-        implementationBuilder.Add($"{indent}add => _eventCollection.{context.UniqueName} += value;");
-        implementationBuilder.Add($"{indent}remove => _eventCollection.{context.UniqueName} -= value;");
-        implementationBuilder.Add($"}}");
-
-        return implementationBuilder.ToImmutable();
-    }
-
-    private bool TryGetEventContext(IEventSymbol eventSymbol, [NotNullWhen(returnValue: true)]out EventContext? context)
+    public bool TryGetEventContext(IEventSymbol eventSymbol, [NotNullWhen(returnValue: true)]out EventContext? context)
     {
         if (!_cache.TryGetValue(eventSymbol.Name, out var contexts))
         {

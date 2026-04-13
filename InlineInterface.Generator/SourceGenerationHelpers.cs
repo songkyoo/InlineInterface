@@ -50,12 +50,15 @@ internal static class SourceGenerationHelpers
 
         var eventContextProvider = new EventContextProvider(
             eventSymbols,
-            genericParameterMap,
+            genericParameterMap
+        );
+        var eventCodeGenerator = new EventCodeGenerator(
+            eventContextProvider,
             interfaceTypeStringProvider,
+            genericParameterMap,
             Indent
         );
-        var eventContexts = eventContextProvider.Contexts.ToImmutableArray();
-        var hasEventMembers = eventContexts.Any();
+        var hasEventMembers = eventContextProvider.Contexts.Any();
 
         var propertyContextProvider = new PropertyContextProvider(
             propertySymbols,
@@ -111,9 +114,9 @@ internal static class SourceGenerationHelpers
 
             depthSpacerText += Indent;
 
-            foreach (var eventContext in eventContexts)
+            foreach (var line in eventCodeGenerator.GetEventCollectionFieldDeclarations())
             {
-                stringBuilder.AppendLine($"{depthSpacerText}public {eventContext.Type} {eventContext.UniqueName};");
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
 
             depthSpacerText = depthSpacerText[..^Indent.Length];
@@ -134,11 +137,11 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}{Indent}_eventCollection = eventCollection;");
             stringBuilder.AppendLine($"{depthSpacerText}}}");
 
-            foreach (var eventSymbol in eventSymbols)
+            foreach (var lines in eventCodeGenerator.GetEventDispatcherImplementations())
             {
                 stringBuilder.AppendLine();
 
-                foreach (var line in eventContextProvider.GetEventDispatcherImplementation(eventSymbol))
+                foreach (var line in lines)
                 {
                     stringBuilder.AppendLine($"{depthSpacerText}{line}");
                 }
@@ -221,7 +224,7 @@ internal static class SourceGenerationHelpers
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in eventContextProvider.GetInterfaceImplementation(eventSymbol))
+            foreach (var line in eventCodeGenerator.GetInterfaceImplementation(eventSymbol))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }

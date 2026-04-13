@@ -620,12 +620,6 @@ public class InlineInterfaceGeneratorTests
                             _eventCollection = eventCollection;
                         }
 
-                        public void RaiseValueChanged(string arg1, int arg2)
-                        {
-                            if (_eventCollection.ValueChanged_0 == null) return;
-                            _eventCollection.ValueChanged_0(arg1, arg2);
-                        }
-
                         public T1? InvokeNameChanged()
                         {
                             if (_eventCollection.NameChanged_0 == null) return default;
@@ -636,6 +630,12 @@ public class InlineInterfaceGeneratorTests
                         {
                             if (_eventCollection.NameChanged_1 == null) return;
                             _eventCollection.NameChanged_1();
+                        }
+
+                        public void RaiseValueChanged(string arg1, int arg2)
+                        {
+                            if (_eventCollection.ValueChanged_0 == null) return;
+                            _eventCollection.ValueChanged_0(arg1, arg2);
                         }
                     }
 
