@@ -73,18 +73,16 @@ public sealed class MethodCodeGenerator(
         }
     }
 
-    public ImmutableArray<string> GetInterfaceImplementation(IMethodSymbol methodSymbol)
+    public string GetInterfaceImplementation(IMethodSymbol methodSymbol)
     {
         if (!methodContextProvider.TryGetMethodContext(methodSymbol, out var context))
         {
-            return ImmutableArray<string>.Empty;
+            return "";
         }
 
         var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType);
 
-        return ImmutableArray.Create(
-            $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw new global::System.NotImplementedException())({context.Arguments});"
-        );
+        return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw new global::System.NotImplementedException())({context.Arguments});";
     }
 
     public IEnumerable<ImmutableArray<string>> GetExtensionMethodImplementation(

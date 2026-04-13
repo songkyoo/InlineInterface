@@ -244,12 +244,10 @@ internal static class SourceGenerationHelpers
         // impl method implementations
         foreach (var methodSymbol in methodSymbols)
         {
-            stringBuilder.AppendLine();
+            var line = methodCodeGenerator.GetInterfaceImplementation(methodSymbol);
 
-            foreach (var line in methodCodeGenerator.GetInterfaceImplementation(methodSymbol))
-            {
-                stringBuilder.AppendLine($"{depthSpacerText}{line}");
-            }
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         // end impl type
