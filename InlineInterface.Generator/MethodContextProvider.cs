@@ -9,7 +9,6 @@ namespace Macaron.InlineInterface;
 public sealed class MethodContextProvider(
     IEnumerable<IMethodSymbol> methodSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
-    InterfaceTypeStringProvider interfaceTypeStringProvider,
     string globalTypeBuilder,
     bool hasEventMembers
 )
@@ -161,19 +160,7 @@ public sealed class MethodContextProvider(
     #endregion
 
     #region Methods
-    public string GetInterfaceImplementation(IMethodSymbol methodSymbol)
-    {
-        if (!TryGetMethodContext(methodSymbol, out var context))
-        {
-            return "";
-        }
-
-        var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType);
-
-        return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw new global::System.NotImplementedException())({context.Arguments});";
-    }
-
-    private bool TryGetMethodContext(
+    public bool TryGetMethodContext(
         IMethodSymbol methodSymbol,
         [NotNullWhen(returnValue: true)]out MethodContext? context
     )

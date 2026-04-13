@@ -25,7 +25,6 @@ internal static class SourceGenerationHelpers
             genericParameterMap
         ) = GetTypeStrings(typeSymbol);
 
-
         // get nested types
         var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
         var containingType = GetContainingType(typeSymbol);
@@ -73,11 +72,14 @@ internal static class SourceGenerationHelpers
         var methodContextProvider = new MethodContextProvider(
             methodSymbols,
             genericParameterMap,
-            interfaceTypeStringProvider,
             globalTypeBuilder,
             hasEventMembers
         );
-        var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
+        var methodCodeGenerator = new MethodCodeGenerator(
+            methodContextProvider,
+            interfaceTypeStringProvider,
+            Indent
+        );
 
         var stringBuilder = CreateStringBuilderWithFileHeader();
         var depthSpacerText = "";
@@ -165,9 +167,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var line in methodCodeGenerator.GetImplFieldDeclarations())
         {
-            stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType}? {methodContext.FieldName};");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         stringBuilder.AppendLine();
@@ -178,11 +180,7 @@ internal static class SourceGenerationHelpers
         var implConstructorParams = new List<string>();
 
         implConstructorParams.AddRange(propertyCodeGenerator.GetImplConstructorParameterFragments());
-
-        foreach (var methodContext in methodContexts)
-        {
-            implConstructorParams.Add($"{methodContext.DelegateType}? {methodContext.ParameterName}");
-        }
+        implConstructorParams.AddRange(methodCodeGenerator.GetImplConstructorParameterFragments());
 
         if (implConstructorParams.Count > 0)
         {
@@ -208,9 +206,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var line in methodCodeGenerator.GetImplConstructorAssignments())
         {
-            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.FieldName} = {methodContext.ParameterName};");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         // end impl constructor body
@@ -241,10 +239,14 @@ internal static class SourceGenerationHelpers
         }
 
         // impl method implementations
-        foreach (var methodImplementation in methodSymbols.Select(methodContextProvider.GetInterfaceImplementation))
+        foreach (var methodSymbol in methodSymbols)
         {
             stringBuilder.AppendLine();
-            stringBuilder.AppendLine($"{depthSpacerText}{methodImplementation}");
+
+            foreach (var line in methodCodeGenerator.GetInterfaceImplementation(methodSymbol))
+            {
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
+            }
         }
 
         // end impl type
@@ -263,9 +265,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var line in methodCodeGenerator.GetBuilderFieldDeclarations())
         {
-            stringBuilder.AppendLine($"{depthSpacerText}private readonly {methodContext.DelegateType}? {methodContext.UniqueName} {{ get; init; }} = null;");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
             stringBuilder.AppendLine();
         }
 
@@ -277,11 +279,7 @@ internal static class SourceGenerationHelpers
         var builderConstructorParams = new List<string>();
 
         builderConstructorParams.AddRange(propertyCodeGenerator.GetBuilderConstructorParameterFragments());
-
-        foreach (var methodContext in methodContexts)
-        {
-            builderConstructorParams.Add($"{methodContext.DelegateType}? {methodContext.ParameterName} = null");
-        }
+        builderConstructorParams.AddRange(methodCodeGenerator.GetBuilderConstructorParameterFragments());
 
         if (builderConstructorParams.Count > 0)
         {
@@ -305,9 +303,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var line in methodCodeGenerator.GetBuilderConstructorAssignments())
         {
-            stringBuilder.AppendLine($"{depthSpacerText}{methodContext.UniqueName} = {methodContext.ParameterName};");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
         }
 
         // end builder constructor body
@@ -323,9 +321,9 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var line in methodCodeGenerator.GetBuilderMethodImplementation(typeBuilder))
         {
-            stringBuilder.AppendLine($"{depthSpacerText}public {typeBuilder} {methodContext.Name}({methodContext.DelegateType} impl) => this with {{ {methodContext.UniqueName} = impl }};");
+            stringBuilder.AppendLine($"{depthSpacerText}{line}");
             stringBuilder.AppendLine();
         }
 
@@ -340,11 +338,7 @@ internal static class SourceGenerationHelpers
         var implConstructorArgs = new List<string>();
 
         implConstructorArgs.AddRange(propertyCodeGenerator.GetBuildArgumentFragments());
-
-        foreach (var methodContext in methodContexts)
-        {
-            implConstructorArgs.Add($"{methodContext.ParameterName}: {methodContext.UniqueName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())");
-        }
+        implConstructorArgs.AddRange(methodCodeGenerator.GetBuildArgumentFragments());
 
         if (implConstructorArgs.Count > 0)
         {
@@ -400,22 +394,18 @@ internal static class SourceGenerationHelpers
             stringBuilder.AppendLine();
         }
 
-        foreach (var methodContext in methodContexts)
+        foreach (var lines in methodCodeGenerator.GetExtensionMethodImplementation(
+            type,
+            globalTypeBuilder,
+            genericParameters,
+            genericParameterConstraints
+        ))
         {
-            stringBuilder.AppendLine($"{depthSpacerText}public static {globalTypeBuilder} {methodContext.Name}{genericParameters}(");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}this global::Macaron.InlineInterface.ImplementationOf<{type}> implementationOf,");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}{methodContext.DelegateType} impl)");
-
-            // constraints
-            foreach (var constraint in genericParameterConstraints)
+            foreach (var line in lines)
             {
-                stringBuilder.AppendLine($"{depthSpacerText}{Indent}{constraint}");
+                stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
 
-            // method body
-            stringBuilder.AppendLine($"{depthSpacerText}{{");
-            stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new {globalTypeBuilder}(allowMissingImplementation: implementationOf.AllowMissingImplementation, {methodContext.ParameterName}: impl);");
-            stringBuilder.AppendLine($"{depthSpacerText}}}");
             stringBuilder.AppendLine();
         }
 
