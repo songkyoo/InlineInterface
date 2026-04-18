@@ -7,16 +7,16 @@ namespace Macaron.InlineInterface;
 
 internal static class InterfaceValidator
 {
-    public static InterfaceValidationResult ValidateTypeSymbol(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
+    public static TargetInterfaceValidationResult ValidateTargetInterface(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
     {
         var interfaceContextsBuilder = ImmutableArray.CreateBuilder<InterfaceContext>();
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
         foreach (var symbol in new[] { interfaceSymbol }.Concat(interfaceSymbol.AllInterfaces))
         {
-            var result = Validate(symbol, typeSyntax);
+            var result = ValidateInterfaceMembers(symbol, typeSyntax);
 
-            if (result.TryGetInterfaceContext(out var interfaceContext))
+            if (result.TryGetContext(out var interfaceContext))
             {
                 interfaceContextsBuilder.Add(interfaceContext);
             }
@@ -27,14 +27,14 @@ internal static class InterfaceValidator
         }
 
         return diagnosticsBuilder.Count > 0
-            ? new InterfaceValidationResult.Failure(Diagnostics: diagnosticsBuilder.ToImmutable())
-            : new InterfaceValidationResult.Success(
+            ? new TargetInterfaceValidationResult.Failure(Diagnostics: diagnosticsBuilder.ToImmutable())
+            : new TargetInterfaceValidationResult.Success(
                 InterfaceSymbol: interfaceSymbol,
                 Contexts: interfaceContextsBuilder.ToImmutable()
             );
     }
 
-    private static InterfaceContextOrDiagnostics Validate(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
+    private static InterfaceMemberValidationResult ValidateInterfaceMembers(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
     {
         var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
         var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
@@ -109,10 +109,10 @@ internal static class InterfaceValidator
 
         if (diagnosticsBuilder.Count > 0)
         {
-            return new InterfaceContextOrDiagnostics(diagnostics: diagnosticsBuilder.ToImmutable());
+            return new InterfaceMemberValidationResult(diagnostics: diagnosticsBuilder.ToImmutable());
         }
 
-        return new InterfaceContextOrDiagnostics(interfaceContext: new InterfaceContext(
+        return new InterfaceMemberValidationResult(context: new InterfaceContext(
             TypeSymbol: interfaceSymbol,
             EventSymbols: eventSymbolsBuilder.ToImmutable(),
             PropertySymbols: propertySymbolsBuilder.ToImmutable(),

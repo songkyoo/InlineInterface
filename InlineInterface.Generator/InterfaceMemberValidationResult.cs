@@ -4,36 +4,36 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal readonly struct InterfaceContextOrDiagnostics
+internal readonly struct InterfaceMemberValidationResult
 {
     private readonly int _index;
-    private readonly InterfaceContext? _interfaceContext;
+    private readonly InterfaceContext? _context;
     private readonly ImmutableArray<Diagnostic> _diagnostics;
 
-    public InterfaceContextOrDiagnostics(InterfaceContext interfaceContext)
+    public InterfaceMemberValidationResult(InterfaceContext context)
     {
         _index = 1;
-        _interfaceContext = interfaceContext;
+        _context = context;
         _diagnostics = ImmutableArray<Diagnostic>.Empty;
     }
 
-    public InterfaceContextOrDiagnostics(ImmutableArray<Diagnostic> diagnostics)
+    public InterfaceMemberValidationResult(ImmutableArray<Diagnostic> diagnostics)
     {
         _index = 2;
-        _interfaceContext = null;
+        _context = null;
         _diagnostics = diagnostics;
     }
 
-    public bool TryGetInterfaceContext([NotNullWhen(returnValue: true)] out InterfaceContext? value)
+    public bool TryGetContext([NotNullWhen(returnValue: true)] out InterfaceContext? context)
     {
         if (_index == 1)
         {
-            value = _interfaceContext!;
+            context = _context!;
 
             return true;
         }
 
-        value = null;
+        context = null;
 
         return false;
     }

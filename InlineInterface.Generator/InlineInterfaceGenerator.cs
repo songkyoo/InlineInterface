@@ -15,37 +15,37 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             .SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (syntaxNode, _) => syntaxNode is InvocationExpressionSyntax,
-                transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Extract(generatorSyntaxContext)
+                transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
             )
-            .Where(static result => result is not TargetTypeExtractionResult.NotApplicable);
+            .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);
 
         var validatedProvider = typeSymbolProvider
             .Collect()
             .SelectMany(static (results, _) =>
             {
                 var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                var builder = ImmutableArray.CreateBuilder<InterfaceValidationResult>();
+                var builder = ImmutableArray.CreateBuilder<TargetInterfaceValidationResult>();
 
                 foreach (var result in results)
                 {
                     switch (result)
                     {
-                        case TargetTypeExtractionResult.Failure failure:
+                        case TargetTypeDiscoveryResult.Failure failure:
                         {
-                            builder.Add(new InterfaceValidationResult.Failure(
+                            builder.Add(new TargetInterfaceValidationResult.Failure(
                                 Diagnostics: ImmutableArray.Create(failure.Diagnostic)
                             ));
 
                             break;
                         }
-                        case TargetTypeExtractionResult.Success success:
+                        case TargetTypeDiscoveryResult.Success success:
                         {
                             if (!seenTypes.Add(success.Symbol))
                             {
                                 continue;
                             }
 
-                            builder.Add(InterfaceValidator.ValidateTypeSymbol(success.Symbol, success.Syntax));
+                            builder.Add(InterfaceValidator.ValidateTargetInterface(success.Symbol, success.Syntax));
 
                             break;
                         }
@@ -61,7 +61,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             {
                 switch (validationResult)
                 {
-                    case InterfaceValidationResult.Failure failure:
+                    case TargetInterfaceValidationResult.Failure failure:
                     {
                         foreach (var diagnostic in failure.Diagnostics)
                         {
@@ -70,7 +70,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 
                         break;
                     }
-                    case InterfaceValidationResult.Success success:
+                    case TargetInterfaceValidationResult.Success success:
                     {
                         var (interfaceSymbol, contexts) = success;
 

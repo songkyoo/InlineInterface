@@ -3,14 +3,14 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal abstract record InterfaceValidationResult
+internal abstract record TargetInterfaceValidationResult
 {
     public sealed record Success(
         INamedTypeSymbol InterfaceSymbol,
         ImmutableArray<InterfaceContext> Contexts
-    ) : InterfaceValidationResult;
+    ) : TargetInterfaceValidationResult;
 
     public sealed record Failure(
         ImmutableArray<Diagnostic> Diagnostics
-    ) : InterfaceValidationResult;
+    ) : TargetInterfaceValidationResult;
 }

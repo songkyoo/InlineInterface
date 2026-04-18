@@ -40,11 +40,11 @@ public partial class InlineInterfaceGeneratorTests
         var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
         var typeSyntax = GetTypeArgumentSyntax(compilation);
 
-        var result = InterfaceValidator.ValidateTypeSymbol(interfaceSymbol, typeSyntax);
+        var result = InterfaceValidator.ValidateTargetInterface(interfaceSymbol, typeSyntax);
 
-        Assert.That(result, Is.TypeOf<InterfaceValidationResult.Success>());
+        Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Success>());
 
-        var success = (InterfaceValidationResult.Success)result;
+        var success = (TargetInterfaceValidationResult.Success)result;
         Assert.That(success.InterfaceSymbol, Is.SameAs(interfaceSymbol));
         Assert.That(success.Contexts, Has.Length.EqualTo(1));
         Assert.That(success.Contexts[0].EventSymbols, Has.Length.EqualTo(1));
@@ -81,11 +81,11 @@ public partial class InlineInterfaceGeneratorTests
         var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
         var typeSyntax = GetTypeArgumentSyntax(compilation);
 
-        var result = InterfaceValidator.ValidateTypeSymbol(interfaceSymbol, typeSyntax);
+        var result = InterfaceValidator.ValidateTargetInterface(interfaceSymbol, typeSyntax);
 
-        Assert.That(result, Is.TypeOf<InterfaceValidationResult.Failure>());
+        Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Failure>());
 
-        var failure = (InterfaceValidationResult.Failure)result;
+        var failure = (TargetInterfaceValidationResult.Failure)result;
         Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MII0003"));
     }
 
@@ -120,11 +120,11 @@ public partial class InlineInterfaceGeneratorTests
         var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
         var typeSyntax = GetTypeArgumentSyntax(compilation);
 
-        var result = InterfaceValidator.ValidateTypeSymbol(interfaceSymbol, typeSyntax);
+        var result = InterfaceValidator.ValidateTargetInterface(interfaceSymbol, typeSyntax);
 
-        Assert.That(result, Is.TypeOf<InterfaceValidationResult.Failure>());
+        Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Failure>());
 
-        var failure = (InterfaceValidationResult.Failure)result;
+        var failure = (TargetInterfaceValidationResult.Failure)result;
         Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MII0007"));
     }
 
@@ -192,9 +192,9 @@ public partial class InlineInterfaceGeneratorTests
             var provider = context.SyntaxProvider
                 .CreateSyntaxProvider(
                     predicate: static (node, _) => node is InvocationExpressionSyntax,
-                    transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Extract(generatorSyntaxContext)
+                    transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
                 )
-                .Where(static result => result is not TargetTypeExtractionResult.NotApplicable);
+                .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);
 
             context.RegisterSourceOutput(
                 provider,
@@ -202,12 +202,12 @@ public partial class InlineInterfaceGeneratorTests
                 {
                     switch (result)
                     {
-                        case TargetTypeExtractionResult.Failure failure:
+                        case TargetTypeDiscoveryResult.Failure failure:
                         {
                             sourceProductionContext.ReportDiagnostic(failure.Diagnostic);
                             break;
                         }
-                        case TargetTypeExtractionResult.Success success:
+                        case TargetTypeDiscoveryResult.Success success:
                         {
                             sourceProductionContext.AddSource(
                                 hintName: $"{success.Symbol.Name}.extractor.g.cs",

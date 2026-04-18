@@ -3,18 +3,18 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
 
-internal abstract record TargetTypeExtractionResult
+internal abstract record TargetTypeDiscoveryResult
 {
-    private TargetTypeExtractionResult() { }
+    private TargetTypeDiscoveryResult() { }
 
     public sealed record Success(
         INamedTypeSymbol Symbol,
         TypeSyntax Syntax
-    ) : TargetTypeExtractionResult;
+    ) : TargetTypeDiscoveryResult;
 
     public sealed record Failure(
         Diagnostic Diagnostic
-    ) : TargetTypeExtractionResult;
+    ) : TargetTypeDiscoveryResult;
 
-    public sealed record NotApplicable : TargetTypeExtractionResult;
+    public sealed record NotApplicable : TargetTypeDiscoveryResult;
 }

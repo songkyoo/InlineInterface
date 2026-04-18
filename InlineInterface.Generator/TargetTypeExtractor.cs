@@ -10,16 +10,16 @@ internal static class TargetTypeExtractor
 {
     private const string ImplementationTypeString = "global::Macaron.InlineInterface.Implementation";
 
-    public static TargetTypeExtractionResult Extract(GeneratorSyntaxContext generatorSyntaxContext)
+    public static TargetTypeDiscoveryResult Discover(GeneratorSyntaxContext generatorSyntaxContext)
     {
         if (generatorSyntaxContext.Node is not InvocationExpressionSyntax expressionSyntax)
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         if (GetGenericNameFromInvocation(expressionSyntax) is not { } genericNameSyntax)
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
@@ -27,13 +27,13 @@ internal static class TargetTypeExtractor
 
         if (methodSymbol?.IsStatic is not true || methodSymbol.Name != "Of")
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         var typeArgumentList = genericNameSyntax.TypeArgumentList;
         if (typeArgumentList.Arguments is not [{ } typeArgumentSyntax])
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         if (semanticModel.GetSymbolInfo(typeArgumentSyntax).Symbol is not INamedTypeSymbol
@@ -41,36 +41,36 @@ internal static class TargetTypeExtractor
             OriginalDefinition: { } typeSymbol,
         })
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         if (methodSymbol.ContainingType.ToDisplayString(FullyQualifiedFormat) != ImplementationTypeString)
         {
-            return new TargetTypeExtractionResult.NotApplicable();
+            return new TargetTypeDiscoveryResult.NotApplicable();
         }
 
         if (typeSymbol.TypeKind != TypeKind.Interface)
         {
-            return new TargetTypeExtractionResult.Failure(
+            return new TargetTypeDiscoveryResult.Failure(
                 Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeMustBeInterface(typeArgumentSyntax)
             );
         }
 
         if (typeArgumentSyntax.ToString().EndsWith("?"))
         {
-            return new TargetTypeExtractionResult.Failure(
+            return new TargetTypeDiscoveryResult.Failure(
                 Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeCannotBeNullable(typeArgumentSyntax)
             );
         }
 
         if (!IsAccessibleFromGeneratedCode(typeSymbol))
         {
-            return new TargetTypeExtractionResult.Failure(
+            return new TargetTypeDiscoveryResult.Failure(
                 Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeMustBeAccessible(typeArgumentSyntax)
             );
         }
 
-        return new TargetTypeExtractionResult.Success(
+        return new TargetTypeDiscoveryResult.Success(
             Symbol: typeSymbol,
             Syntax: typeArgumentSyntax
         );
