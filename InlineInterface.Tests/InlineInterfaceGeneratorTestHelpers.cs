@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface.Tests;
 
@@ -119,6 +120,50 @@ public partial class InlineInterfaceGeneratorTests
             .ToArray();
 
         Assert.That(actualDiagnosticIds, Has.Some.Matches(expectedDiagnosticId));
+    }
+
+    private static CSharpCompilation CreateCompilation(string sourceCode, Assembly[]? additionalAssemblies = null)
+    {
+        var references = AppDomain
+            .CurrentDomain
+            .GetAssemblies()
+            .Concat(additionalAssemblies ?? [])
+            .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
+            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
+            .Cast<MetadataReference>()
+            .ToImmutableArray();
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
+
+        return CSharpCompilation.Create(
+            assemblyName: "Macaron.InlineInterface.Tests",
+            syntaxTrees: [syntaxTree],
+            references: references,
+            options: new CSharpCompilationOptions(
+                outputKind: OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable
+            )
+        );
+    }
+
+    private static INamedTypeSymbol GetNamedTypeSymbol(CSharpCompilation compilation, string metadataName)
+    {
+        return
+            compilation.GetTypeByMetadataName(metadataName) ??
+            throw new InvalidOperationException($"Could not find type '{metadataName}'.");
+    }
+
+    private static TypeSyntax GetTypeArgumentSyntax(CSharpCompilation compilation)
+    {
+        var syntaxTree = compilation.SyntaxTrees.Single();
+        var root = syntaxTree.GetRoot();
+
+        return root
+            .DescendantNodes()
+            .OfType<GenericNameSyntax>()
+            .Where(name => name.Identifier.ValueText == "Of")
+            .SelectMany(name => name.TypeArgumentList.Arguments)
+            .Single();
     }
 
 }
