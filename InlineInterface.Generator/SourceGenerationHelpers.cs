@@ -69,6 +69,7 @@ internal static class SourceGenerationHelpers
         var propertyCodeGenerator = new PropertyCodeGenerator(
             propertyContextProvider,
             interfaceTypeStringProvider,
+            typeBuilder,
             Indent
         );
 
@@ -81,6 +82,7 @@ internal static class SourceGenerationHelpers
         var methodCodeGenerator = new MethodCodeGenerator(
             methodContextProvider,
             interfaceTypeStringProvider,
+            typeBuilder,
             Indent
         );
 
@@ -257,6 +259,18 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
 
         // builder field members
+        stringBuilder.AppendLine($"{depthSpacerText}private const string InterfaceDisplayName = {ToStringLiteral(type)};");
+        stringBuilder.AppendLine();
+        stringBuilder.AppendLine($"{depthSpacerText}private static global::System.InvalidOperationException CreateMissingBuildDelegateException(string memberDescription)");
+        stringBuilder.AppendLine($"{depthSpacerText}{{");
+        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new global::System.InvalidOperationException($\"Cannot build inline implementation for '{{InterfaceDisplayName}}' because no delegate was provided for {{memberDescription}}. Pass a delegate or set allowMissingImplementation: true.\");");
+        stringBuilder.AppendLine($"{depthSpacerText}}}");
+        stringBuilder.AppendLine();
+        stringBuilder.AppendLine($"{depthSpacerText}private static global::System.NotImplementedException CreateMissingInvocationDelegateException(string memberDescription)");
+        stringBuilder.AppendLine($"{depthSpacerText}{{");
+        stringBuilder.AppendLine($"{depthSpacerText}{Indent}return new global::System.NotImplementedException($\"No delegate was configured for {{memberDescription}} on '{{InterfaceDisplayName}}'. This can happen when Build was called with allowMissingImplementation: true.\");");
+        stringBuilder.AppendLine($"{depthSpacerText}}}");
+        stringBuilder.AppendLine();
         stringBuilder.AppendLine($"{depthSpacerText}private readonly bool _allowMissingImplementation;");
         stringBuilder.AppendLine();
 
@@ -553,5 +567,10 @@ internal static class SourceGenerationHelpers
         }
 
         return $"{typeSymbol.Name}_{typeSymbol.Arity}.{hash:x8}.g.cs";
+    }
+
+    private static string ToStringLiteral(string value)
+    {
+        return $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
     }
 }

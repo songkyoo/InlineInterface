@@ -6,6 +6,7 @@ namespace Macaron.InlineInterface;
 public sealed class MethodCodeGenerator(
     MethodContextProvider methodContextProvider,
     InterfaceTypeStringProvider interfaceTypeStringProvider,
+    string containingBuilderType,
     string indent
 )
 {
@@ -69,7 +70,7 @@ public sealed class MethodCodeGenerator(
     {
         foreach (var methodContext in methodContextProvider.Contexts)
         {
-            yield return $"{methodContext.ParameterName}: {methodContext.UniqueName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())";
+            yield return $"{methodContext.ParameterName}: {methodContext.UniqueName} ?? (_allowMissingImplementation ? null : throw CreateMissingBuildDelegateException({CreateMessageLiteral($"method '{methodContext.Name}({methodContext.Parameters})'")}))";
         }
     }
 
@@ -81,8 +82,9 @@ public sealed class MethodCodeGenerator(
         }
 
         var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType);
+        var memberDescription = CreateMessageLiteral($"method '{interfaceTypeString}.{context.Name}({context.Parameters})'");
 
-        return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw new global::System.NotImplementedException())({context.Arguments});";
+        return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";
     }
 
     public IEnumerable<ImmutableArray<string>> GetExtensionMethodImplementation(
@@ -111,5 +113,10 @@ public sealed class MethodCodeGenerator(
 
             yield return implementationBuilder.ToImmutable();
         }
+    }
+
+    private static string CreateMessageLiteral(string value)
+    {
+        return $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
     }
 }

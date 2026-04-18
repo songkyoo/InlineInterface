@@ -6,6 +6,7 @@ namespace Macaron.InlineInterface;
 public sealed class PropertyCodeGenerator(
     PropertyContextProvider propertyContextProvider,
     InterfaceTypeStringProvider interfaceTypeStringProvider,
+    string containingBuilderType,
     string indent
 )
 {
@@ -194,7 +195,7 @@ public sealed class PropertyCodeGenerator(
                 GetterParameterName: { } getterParameterName,
             })
             {
-                yield return $"{getterParameterName}: {getterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())";
+                yield return $"{getterParameterName}: {getterName} ?? (_allowMissingImplementation ? null : throw CreateMissingBuildDelegateException({CreateBuildMemberDescriptionLiteral(propertyContext, "getter")}))";
             }
 
             if (propertyContext is
@@ -203,7 +204,7 @@ public sealed class PropertyCodeGenerator(
                 SetterParameterName: { } setterParameterName,
             })
             {
-                yield return $"{setterParameterName}: {setterName} ?? (_allowMissingImplementation ? null : throw new global::System.InvalidOperationException())";
+                yield return $"{setterParameterName}: {setterName} ?? (_allowMissingImplementation ? null : throw CreateMissingBuildDelegateException({CreateBuildMemberDescriptionLiteral(propertyContext, "setter")}))";
             }
         }
     }
@@ -229,8 +230,9 @@ public sealed class PropertyCodeGenerator(
         if (propertySymbol.GetMethod != null)
         {
             var getterArguments = context.Arguments;
+            var getterMemberDescription = CreateInvocationMemberDescriptionLiteral(interfaceTypeString, context, "getter");
 
-            implementationBuilder.Add($"{indent}get => ({context.GetterFieldName} ?? throw new global::System.NotImplementedException())({getterArguments});");
+            implementationBuilder.Add($"{indent}get => ({context.GetterFieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({getterMemberDescription}))({getterArguments});");
         }
 
         if (propertySymbol.SetMethod != null)
@@ -238,8 +240,9 @@ public sealed class PropertyCodeGenerator(
             var setterArguments = string.IsNullOrEmpty(context.Arguments)
                 ? "value"
                 : $"{context.Arguments}, value";
+            var setterMemberDescription = CreateInvocationMemberDescriptionLiteral(interfaceTypeString, context, "setter");
 
-            implementationBuilder.Add($"{indent}set => ({context.SetterFieldName} ?? throw new global::System.NotImplementedException())({setterArguments});");
+            implementationBuilder.Add($"{indent}set => ({context.SetterFieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({setterMemberDescription}))({setterArguments});");
         }
 
         implementationBuilder.Add("}");
@@ -304,5 +307,37 @@ public sealed class PropertyCodeGenerator(
 
             yield return implementationBuilder.ToImmutable();
         }
+    }
+
+    private static string CreateBuildMemberDescriptionLiteral(PropertyContext context, string accessor)
+    {
+        var memberDescription = context.IsIndexer
+            ? $"indexer '{CreateIndexerSignature(context.Parameters)}' ({accessor})"
+            : $"property '{context.Name}' ({accessor})";
+
+        return ToStringLiteral(memberDescription);
+    }
+
+    private static string CreateInvocationMemberDescriptionLiteral(
+        string interfaceTypeString,
+        PropertyContext context,
+        string accessor
+    )
+    {
+        var memberDescription = context.IsIndexer
+            ? $"indexer '{interfaceTypeString}.this[{context.Parameters}]' ({accessor})"
+            : $"property '{interfaceTypeString}.{context.Name}' ({accessor})";
+
+        return ToStringLiteral(memberDescription);
+    }
+
+    private static string CreateIndexerSignature(string parameters)
+    {
+        return $"this[{parameters}]";
+    }
+
+    private static string ToStringLiteral(string value)
+    {
+        return $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
     }
 }
