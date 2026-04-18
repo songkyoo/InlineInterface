@@ -22,7 +22,7 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `InlineInterface.Core`
   Minimal runtime API surface used by consumers.
 - `InlineInterface.Generator`
-  Incremental source generator that discovers `Implementation.Of<T>()` usages and emits builders plus extension methods.
+  Incremental source generator plus analyzer assembly that discovers `Implementation.Of<T>()` usages, emits builders plus extension methods, and reports usage diagnostics for incomplete builder chains.
 - `InlineInterface.Tests`
   NUnit test project that validates generated source, diagnostics, and internal validation behavior.
 
@@ -46,6 +46,7 @@ The packaged library is published as `Macaron.InlineInterface`.
    - an internal `Impl` class implementing the interface
    - `ImplementationOfExtensions` methods for fluent configuration
    - an extension `Build()` method
+6. Analyze `Implementation.Of<T>()` usage chains and report diagnostics when the builder is stored, the chain does not end with `Build()`, or required delegates are missing while `allowMissingImplementation` is `false`.
 
 ## Supported Interface Members
 
@@ -65,15 +66,21 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `MII0005`: unexpected member kinds are rejected
 - `MII0006`: target interface and containing types must be accessible from generated code
 - `MII0007`: event delegate parameters only allow `in`; `ref`, `out`, and `params` are rejected
+- `MII0008`: inline interface builders must stay in one fluent expression and end with `Build()`
+- `MII0009`: when `allowMissingImplementation` is `false`, every required method/property/indexer delegate must be configured before `Build()`
 
 ## Generation Notes
 
 - The builder stores delegates for each property accessor and method.
+- Consumers are expected to keep builder usage inline: `Implementation.Of<T>()...Build()`.
+- The analyzer intentionally discourages storing the intermediate builder in locals, fields, returns, or helper parameters.
+- `ImplementationBuilderAnalyzer` currently uses `SyntaxNodeAction` plus the provided `context.SemanticModel`; avoid calling `Compilation.GetSemanticModel(...)` inside the analyzer to keep Roslyn analyzer warnings and binding overhead down.
 - If the target interface contains events, generated code also includes `EventCollection` and `EventDispatcher`.
 - When events exist, generated method/property delegates can receive `EventDispatcher` as a leading argument so implementations can raise events.
 - Event delegate `in` modifiers are preserved in generated dispatcher methods.
-- `allowMissingImplementation: false` means missing delegates cause `InvalidOperationException` during `Build()`.
-- Missing delegates that still reach the implementation throw `NotImplementedException` when invoked.
+- `allowMissingImplementation: false` means missing delegates cause `InvalidOperationException` during `Build()`, and the message includes the target interface/member context.
+- The analyzer mirrors that runtime rule for single-expression chains and reports missing required delegates at compile time when possible.
+- Missing delegates that still reach the implementation throw `NotImplementedException` when invoked, and the message includes the interface/member that was not configured.
 - Source is currently assembled mostly through string-building helpers rather than syntax factories.
 
 ## Important Files
@@ -82,6 +89,7 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `InlineInterface.Core/ImplementationOf_1.cs`
 - `InlineInterface.Core/Tag.cs`
 - `InlineInterface.Generator/InlineInterfaceGenerator.cs`
+- `InlineInterface.Generator/ImplementationBuilderAnalyzer.cs`
 - `InlineInterface.Generator/InlineInterfaceDiagnostics.cs`
 - `InlineInterface.Generator/InterfaceValidator.cs`
 - `InlineInterface.Generator/SourceGenerationHelpers.cs`
@@ -89,12 +97,13 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `InlineInterface.Generator/PropertyCodeGenerator.cs`
 - `InlineInterface.Generator/EventCodeGenerator.cs`
 - `InlineInterface.Tests/InlineInterfaceGeneratorDiagnosticTests.cs`
+- `InlineInterface.Tests/InlineInterfaceBuilderAnalyzerTests.cs`
 - `InlineInterface.Tests/InlineInterfaceGeneratorGenerationTests.cs`
 - `InlineInterface.Tests/InlineInterfaceInternalValidationTests.cs`
 
 ## Test Status
 
-Verified on 2026-04-18 with:
+Verified on 2026-04-19 with:
 
 ```powershell
 dotnet test InlineInterface.sln
@@ -102,11 +111,14 @@ dotnet test InlineInterface.sln
 
 Result at analysis time:
 
-- 29 tests passed
+- 35 tests passed
 - 0 failed
 
 ## Notes For Future Work
 
 - If new member kinds are added, update both validation and code generation paths.
+- If the fluent API shape changes, update both generated extension naming and `ImplementationBuilderAnalyzer` member-matching logic.
+- If analyzer logic is expanded, prefer keeping it on the existing syntax/semantic-model path unless there is a clear benefit to more complex operation/dataflow analysis.
 - Changes to generated output should usually be covered by exact-string tests or fragment tests.
+- Analyzer behavior should be covered with same-expression-chain tests before adding wider dataflow analysis.
 - `SourceGenerationHelpers` is the main composition point and likely the first file to inspect during feature work.
