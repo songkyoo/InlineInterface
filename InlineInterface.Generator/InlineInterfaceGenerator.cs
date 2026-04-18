@@ -149,6 +149,14 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+    private static readonly DiagnosticDescriptor NotAllowedEventModifierRule = new(
+        id: "MII0007",
+        title: "Event delegate parameter modifiers are not allowed",
+        messageFormat: "Event '{1}' in target interface '{0}' has unsupported delegate parameter modifiers. Only 'in' is supported for event delegate parameters.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
     #endregion
 
     #region Static
@@ -312,9 +320,30 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                     }
                     case IEventSymbol { IsStatic: false } @event:
                     {
+                        if (@event.Type is INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod } &&
+                            invokeMethod.Parameters.Any(HasNotAllowedModifier)
+                        )
+                        {
+                            diagnosticsBuilder.Add(Diagnostic.Create(
+                                descriptor: NotAllowedEventModifierRule,
+                                location: typeSyntax.GetLocation(),
+                                messageArgs: [typeSyntax, @event.Name]
+                            ));
+
+                            break;
+                        }
+
                         eventSymbolsBuilder.Add(@event);
 
                         break;
+
+                        #region Local Functions
+
+                        static bool HasNotAllowedModifier(IParameterSymbol symbol)
+                        {
+                            return (symbol.RefKind != RefKind.None && symbol.RefKind != RefKind.In) || symbol.IsParams;
+                        }
+                        #endregion
                     }
                     case IMethodSymbol { IsStatic: false } method:
                     {

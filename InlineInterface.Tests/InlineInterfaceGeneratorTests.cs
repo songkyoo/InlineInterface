@@ -462,6 +462,128 @@ public class InlineInterfaceGeneratorTests
     }
 
     [Test]
+    public void GeneratesEventDispatcherThatPreservesInModifiers()
+    {
+        AssertGeneratedCodeContainsAll(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            namespace Macaron.InlineInterface.Tests;
+
+            public delegate void BufferChangedHandler(in int previous);
+
+            public interface IBuffer
+            {
+                event BufferChangedHandler Changed;
+            }
+
+            public class TestClass
+            {
+                public void TestMethod()
+                {
+                    _ = Implementation.Of<IBuffer>();
+                }
+            }
+            """,
+            expectedFragments:
+            [
+                "public global::Macaron.InlineInterface.Tests.BufferChangedHandler? Changed_0;",
+                "public void Changed(in int previous)",
+                "if (_eventCollection.Changed_0 != null) _eventCollection.Changed_0(in previous);",
+                "event global::Macaron.InlineInterface.Tests.BufferChangedHandler? global::Macaron.InlineInterface.Tests.IBuffer.Changed",
+            ]
+        );
+    }
+
+    [Test]
+    public void ReportsDiagnosticWhenEventDelegateContainsOutParameter()
+    {
+        AssertDiagnostic(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            namespace Macaron.InlineInterface.Tests;
+
+            public delegate void BufferChangedHandler(out int current);
+
+            public interface IBuffer
+            {
+                event BufferChangedHandler Changed;
+            }
+
+            public class TestClass
+            {
+                public void TestMethod()
+                {
+                    _ = Implementation.Of<IBuffer>();
+                }
+            }
+            """,
+            expectedDiagnosticId: "MII0007"
+        );
+    }
+
+    [Test]
+    public void ReportsDiagnosticWhenEventDelegateContainsRefParameter()
+    {
+        AssertDiagnostic(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            namespace Macaron.InlineInterface.Tests;
+
+            public delegate void BufferChangedHandler(ref int current);
+
+            public interface IBuffer
+            {
+                event BufferChangedHandler Changed;
+            }
+
+            public class TestClass
+            {
+                public void TestMethod()
+                {
+                    _ = Implementation.Of<IBuffer>();
+                }
+            }
+            """,
+            expectedDiagnosticId: "MII0007"
+        );
+    }
+
+    [Test]
+    public void ReportsDiagnosticWhenEventDelegateContainsParamsParameter()
+    {
+        AssertDiagnostic(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            namespace Macaron.InlineInterface.Tests;
+
+            public delegate void BufferChangedHandler(params int[] current);
+
+            public interface IBuffer
+            {
+                event BufferChangedHandler Changed;
+            }
+
+            public class TestClass
+            {
+                public void TestMethod()
+                {
+                    _ = Implementation.Of<IBuffer>();
+                }
+            }
+            """,
+            expectedDiagnosticId: "MII0007"
+        );
+    }
+
+    [Test]
     public void GeneratesDistinctTypeParameterNamesForNestedTypesWithDuplicateGenericParameterNames()
     {
         AssertGeneratedCodeContainsAll(

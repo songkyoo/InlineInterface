@@ -33,13 +33,16 @@ public sealed class EventCodeGenerator(
 
             var parameters = new List<string>();
             var arguments = new List<string>();
-
             foreach (var paramSymbol in methodSymbol.Parameters)
             {
-                var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
+                var (type, name) = GetParameterString(
+                    paramSymbol,
+                    genericParameterMap,
+                    includeModifier: true
+                );
 
                 parameters.Add($"{type} {name}");
-                arguments.Add(name);
+                arguments.Add(GetArgumentString(paramSymbol, includeModifier: true));
             }
 
             if (!methodSymbol.ReturnsVoid)
