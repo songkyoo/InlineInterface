@@ -24,7 +24,7 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `InlineInterface.Generator`
   Incremental source generator that discovers `Implementation.Of<T>()` usages and emits builders plus extension methods.
 - `InlineInterface.Tests`
-  NUnit test project that validates generated source and diagnostics.
+  NUnit test project that validates generated source, diagnostics, and internal validation behavior.
 
 ## Key Runtime Types
 
@@ -61,14 +61,17 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `MII0001`: target type must be an interface
 - `MII0002`: nullable interface targets are not supported
 - `MII0003`: generic methods are not supported
-- `MII0004`: `ref`, `out`, `in`, and `params` parameters are not supported
+- `MII0004`: method parameters with `ref`, `out`, `in`, or `params` are not supported
 - `MII0005`: unexpected member kinds are rejected
 - `MII0006`: target interface and containing types must be accessible from generated code
+- `MII0007`: event delegate parameters only allow `in`; `ref`, `out`, and `params` are rejected
 
 ## Generation Notes
 
 - The builder stores delegates for each property accessor and method.
 - If the target interface contains events, generated code also includes `EventCollection` and `EventDispatcher`.
+- When events exist, generated method/property delegates can receive `EventDispatcher` as a leading argument so implementations can raise events.
+- Event delegate `in` modifiers are preserved in generated dispatcher methods.
 - `allowMissingImplementation: false` means missing delegates cause `InvalidOperationException` during `Build()`.
 - Missing delegates that still reach the implementation throw `NotImplementedException` when invoked.
 - Source is currently assembled mostly through string-building helpers rather than syntax factories.
@@ -79,11 +82,15 @@ The packaged library is published as `Macaron.InlineInterface`.
 - `InlineInterface.Core/ImplementationOf_1.cs`
 - `InlineInterface.Core/Tag.cs`
 - `InlineInterface.Generator/InlineInterfaceGenerator.cs`
+- `InlineInterface.Generator/InlineInterfaceDiagnostics.cs`
+- `InlineInterface.Generator/InterfaceValidator.cs`
 - `InlineInterface.Generator/SourceGenerationHelpers.cs`
 - `InlineInterface.Generator/MethodCodeGenerator.cs`
 - `InlineInterface.Generator/PropertyCodeGenerator.cs`
 - `InlineInterface.Generator/EventCodeGenerator.cs`
-- `InlineInterface.Tests/InlineInterfaceGeneratorTests.cs`
+- `InlineInterface.Tests/InlineInterfaceGeneratorDiagnosticTests.cs`
+- `InlineInterface.Tests/InlineInterfaceGeneratorGenerationTests.cs`
+- `InlineInterface.Tests/InlineInterfaceInternalValidationTests.cs`
 
 ## Test Status
 
@@ -95,7 +102,7 @@ dotnet test InlineInterface.sln
 
 Result at analysis time:
 
-- 20 tests passed
+- 29 tests passed
 - 0 failed
 
 ## Notes For Future Work
