@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Macaron.InlineInterface.Tests;
 
@@ -90,7 +91,6 @@ public partial class InlineInterfaceGeneratorTests
             sourceCode,
             additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
         );
-
         var generatedCode = generatedCodes[sourceIndex].ReplaceLineEndings();
 
         foreach (var expectedFragment in expectedFragments)
@@ -113,13 +113,57 @@ public partial class InlineInterfaceGeneratorTests
             sourceCode,
             additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
         );
-
         var actualDiagnosticIds = diagnostics
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .Select(diagnostic => diagnostic.Id)
             .ToArray();
 
         Assert.That(actualDiagnosticIds, Has.Some.Matches(expectedDiagnosticId));
+    }
+
+    private static ImmutableArray<Diagnostic> AnalyzeAndGetDiagnostics<TAnalyzer>(string sourceCode)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        var compilation = CreateCompilation(
+            sourceCode,
+            additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
+        );
+        var generatorDriver = CSharpGeneratorDriver.Create(new InlineInterfaceGenerator());
+
+        generatorDriver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out _
+        );
+
+        return outputCompilation
+            .WithAnalyzers([new TAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult()
+            .ToImmutableArray();
+    }
+
+    private static void AssertAnalyzerDiagnostic<TAnalyzer>(string sourceCode, string expectedDiagnosticId)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        var actualDiagnosticIds = AnalyzeAndGetDiagnostics<TAnalyzer>(sourceCode)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id)
+            .ToArray();
+
+        Assert.That(actualDiagnosticIds, Has.Some.Matches(expectedDiagnosticId));
+    }
+
+    private static void AssertNoAnalyzerDiagnostic<TAnalyzer>(string sourceCode, string diagnosticId)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        var actualDiagnosticIds = AnalyzeAndGetDiagnostics<TAnalyzer>(sourceCode)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id)
+            .ToArray();
+
+        Assert.That(actualDiagnosticIds, Has.None.Matches(diagnosticId));
     }
 
     private static CSharpCompilation CreateCompilation(string sourceCode, Assembly[]? additionalAssemblies = null)

@@ -66,4 +66,22 @@ internal static class InlineInterfaceDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor BuilderMustBeCompletedInSameExpressionRule = new(
+        id: "MII0008",
+        title: "Inline interface builder must be completed in the same expression",
+        messageFormat: "Inline interface builders must stay in a single fluent chain ending with 'Build()'. Do not store the intermediate builder or pass it around.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
+    public static readonly DiagnosticDescriptor MissingRequiredBuilderMembersRule = new(
+        id: "MII0009",
+        title: "Inline interface builder is missing required delegates",
+        messageFormat: "Inline interface implementation for '{0}' is missing delegate configuration for {1}. Pass delegates for all required members or set allowMissingImplementation: true.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 }
