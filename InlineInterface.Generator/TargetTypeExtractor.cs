@@ -52,33 +52,21 @@ internal static class TargetTypeExtractor
         if (typeSymbol.TypeKind != TypeKind.Interface)
         {
             return new TargetTypeExtractionResult.Failure(
-                Diagnostic: Diagnostic.Create(
-                    descriptor: InlineInterfaceDiagnostics.TargetTypeMustBeInterfaceRule,
-                    location: typeArgumentSyntax.GetLocation(),
-                    messageArgs: [typeArgumentSyntax]
-                )
+                Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeMustBeInterface(typeArgumentSyntax)
             );
         }
 
         if (typeArgumentSyntax.ToString().EndsWith("?"))
         {
             return new TargetTypeExtractionResult.Failure(
-                Diagnostic: Diagnostic.Create(
-                    descriptor: InlineInterfaceDiagnostics.TargetTypeCannotBeNullableRule,
-                    location: typeArgumentSyntax.GetLocation(),
-                    messageArgs: [typeArgumentSyntax]
-                )
+                Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeCannotBeNullable(typeArgumentSyntax)
             );
         }
 
         if (!IsAccessibleFromGeneratedCode(typeSymbol))
         {
             return new TargetTypeExtractionResult.Failure(
-                Diagnostic: Diagnostic.Create(
-                    descriptor: InlineInterfaceDiagnostics.TargetTypeMustBeAccessibleRule,
-                    location: typeArgumentSyntax.GetLocation(),
-                    messageArgs: [typeArgumentSyntax]
-                )
+                Diagnostic: InlineInterfaceDiagnosticFactory.TargetTypeMustBeAccessible(typeArgumentSyntax)
             );
         }
 

@@ -58,11 +58,7 @@ internal static class InterfaceValidator
                             (paramSymbol.RefKind != RefKind.None && paramSymbol.RefKind != RefKind.In)
                             || paramSymbol.IsParams))
                     {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: InlineInterfaceDiagnostics.NotAllowedEventModifierRule,
-                            location: typeSyntax.GetLocation(),
-                            messageArgs: [typeSyntax, @event.Name]
-                        ));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(typeSyntax, @event.Name));
 
                         break;
                     }
@@ -82,22 +78,14 @@ internal static class InterfaceValidator
 
                     if (method.IsGenericMethod)
                     {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: InlineInterfaceDiagnostics.NotAllowedGenericMethodRule,
-                            location: typeSyntax.GetLocation(),
-                            messageArgs: [typeSyntax, method.Name]
-                        ));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(typeSyntax, method.Name));
 
                         break;
                     }
 
                     if (method.Parameters.Any(paramSymbol => paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams))
                     {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: InlineInterfaceDiagnostics.NotAllowedMethodModifierRule,
-                            location: typeSyntax.GetLocation(),
-                            messageArgs: [typeSyntax, method.Name]
-                        ));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(typeSyntax, method.Name));
 
                         break;
                     }
@@ -112,11 +100,7 @@ internal static class InterfaceValidator
                 }
                 default:
                 {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: InlineInterfaceDiagnostics.UnexpectedMemberTypeRule,
-                        location: typeSyntax.GetLocation(),
-                        messageArgs: [typeSyntax, member.Kind, member.Name]
-                    ));
+                    diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.UnexpectedMemberType(typeSyntax, member.Kind, member.Name));
 
                     break;
                 }
