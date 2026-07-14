@@ -55,10 +55,15 @@ internal static class InterfaceValidator
                 {
                     if (@event.Type is INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod }
                         && invokeMethod.Parameters.Any(paramSymbol =>
-                            (paramSymbol.RefKind != RefKind.None && paramSymbol.RefKind != RefKind.In)
-                            || paramSymbol.IsParams))
+                        {
+                            return paramSymbol.RefKind is not RefKind.None and not RefKind.In || paramSymbol.IsParams;
+                        })
+                    )
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(typeSyntax, @event.Name));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(
+                            typeSyntax,
+                            @event.Name
+                        ));
 
                         break;
                     }
@@ -71,21 +76,32 @@ internal static class InterfaceValidator
                 {
                     if (method.MethodKind
                         is MethodKind.EventAdd or MethodKind.EventRemove
-                        or MethodKind.PropertyGet or MethodKind.PropertySet)
+                        or MethodKind.PropertyGet or MethodKind.PropertySet
+                    )
                     {
                         break;
                     }
 
                     if (method.IsGenericMethod)
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(typeSyntax, method.Name));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(
+                            typeSyntax,
+                            method.Name
+                        ));
 
                         break;
                     }
 
-                    if (method.Parameters.Any(paramSymbol => paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams))
+                    if (method.Parameters.Any(paramSymbol =>
+                        {
+                            return paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams;
+                        })
+                    )
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(typeSyntax, method.Name));
+                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(
+                            typeSyntax,
+                            method.Name
+                        ));
 
                         break;
                     }
@@ -100,7 +116,11 @@ internal static class InterfaceValidator
                 }
                 default:
                 {
-                    diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.UnexpectedMemberType(typeSyntax, member.Kind, member.Name));
+                    diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.UnexpectedMemberType(
+                        typeSyntax,
+                        member.Kind,
+                        member.Name
+                    ));
 
                     break;
                 }

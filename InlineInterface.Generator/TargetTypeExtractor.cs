@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
+using static Macaron.InlineInterface.SymbolHelpers;
 using static Microsoft.CodeAnalysis.Accessibility;
 
 namespace Macaron.InlineInterface;
@@ -20,7 +21,7 @@ internal static class TargetTypeExtractor
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
-        var methodSymbol = semanticModel.GetSymbolInfo(genericNameSyntax).Symbol as IMethodSymbol;
+        var methodSymbol = ModelExtensions.GetSymbolInfo(semanticModel, genericNameSyntax).Symbol as IMethodSymbol;
 
         if (methodSymbol?.IsStatic is not true ||
             methodSymbol.Name != "Of" ||
@@ -32,7 +33,7 @@ internal static class TargetTypeExtractor
 
         var typeArgumentSyntax = genericNameSyntax.TypeArgumentList.Arguments[0];
 
-        if (semanticModel.GetSymbolInfo(typeArgumentSyntax).Symbol is not INamedTypeSymbol
+        if (ModelExtensions.GetSymbolInfo(semanticModel, typeArgumentSyntax).Symbol is not INamedTypeSymbol
             {
                 OriginalDefinition: { } typeSymbol,
             }
@@ -48,7 +49,7 @@ internal static class TargetTypeExtractor
             );
         }
 
-        if (typeArgumentSyntax.ToString().EndsWith("?"))
+        if (typeArgumentSyntax.IsKind(SyntaxKind.NullableType))
         {
             return new TargetTypeDiscoveryResult.Failure(
                 InlineInterfaceDiagnosticFactory.TargetTypeCannotBeNullable(typeArgumentSyntax)

@@ -10,6 +10,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        // 대상 호출 판별
         var typeSymbolProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
@@ -18,66 +19,59 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             )
             .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);
 
+        context.RegisterSourceOutput(
+            source: typeSymbolProvider
+                .Where(static result => result is TargetTypeDiscoveryResult.Failure)
+                .Select(static (result, _) => (TargetTypeDiscoveryResult.Failure)result),
+            action: static (sourceProductionContext, failure) =>
+            {
+                sourceProductionContext.ReportDiagnostic(failure.Diagnostic);
+            }
+        );
+
         var validatedProvider = typeSymbolProvider
+            .Where(static result => result is TargetTypeDiscoveryResult.Success)
+            .Select(static (result, _) => (TargetTypeDiscoveryResult.Success)result)
             .Collect()
             .SelectMany(static (results, _) =>
             {
                 var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                var builder = ImmutableArray.CreateBuilder<TargetInterfaceValidationResult>();
+                var builder = new List<TargetInterfaceValidationResult>();
 
-                foreach (var result in results)
+                foreach (var success in results)
                 {
-                    switch (result)
+                    if (!seenTypes.Add(success.Symbol))
                     {
-                        case TargetTypeDiscoveryResult.Failure failure:
-                        {
-                            builder.Add(new TargetInterfaceValidationResult.Failure(
-                                Diagnostics: ImmutableArray.Create(failure.Diagnostic)
-                            ));
-
-                            break;
-                        }
-                        case TargetTypeDiscoveryResult.Success success:
-                        {
-                            if (!seenTypes.Add(success.Symbol))
-                            {
-                                continue;
-                            }
-
-                            builder.Add(InterfaceValidator.ValidateTargetInterface(success.Symbol, success.Syntax));
-
-                            break;
-                        }
+                        continue;
                     }
+
+                    builder.Add(InterfaceValidator.ValidateTargetInterface(success.Symbol, success.Syntax));
                 }
 
-                return builder.ToImmutable();
+                return builder;
             });
 
         context.RegisterSourceOutput(
-            source: validatedProvider,
-            action: (sourceProductionContext, validationResult) =>
+            source: validatedProvider
+                .Where(static result => result is TargetInterfaceValidationResult.Failure)
+                .Select(static (result, _) => (TargetInterfaceValidationResult.Failure)result),
+            action: static (sourceProductionContext, failure) =>
             {
-                switch (validationResult)
+                foreach (var diagnostic in failure.Diagnostics)
                 {
-                    case TargetInterfaceValidationResult.Failure failure:
-                    {
-                        foreach (var diagnostic in failure.Diagnostics)
-                        {
-                            sourceProductionContext.ReportDiagnostic(diagnostic);
-                        }
-
-                        break;
-                    }
-                    case TargetInterfaceValidationResult.Success success:
-                    {
-                        var (interfaceSymbol, contexts) = success;
-
-                        AddSource(sourceProductionContext, interfaceSymbol, contexts);
-
-                        break;
-                    }
+                    sourceProductionContext.ReportDiagnostic(diagnostic);
                 }
+            }
+        );
+        context.RegisterSourceOutput(
+            source: validatedProvider
+                .Where(static result => result is TargetInterfaceValidationResult.Success)
+                .Select(static (result, _) => (TargetInterfaceValidationResult.Success)result),
+            action: static (sourceProductionContext, success) =>
+            {
+                var (interfaceSymbol, contexts) = success;
+
+                AddSource(sourceProductionContext, interfaceSymbol, contexts);
             }
         );
     }

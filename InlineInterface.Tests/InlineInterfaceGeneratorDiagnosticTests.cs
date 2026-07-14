@@ -3,6 +3,52 @@ namespace Macaron.InlineInterface.Tests;
 public partial class InlineInterfaceGeneratorTests
 {
     [Test]
+    public void ReportsDiagnosticsWithoutBlockingSuccessfulGeneration()
+    {
+        var (diagnostics, generatedCodes) = CompileAndGetResults<InlineInterfaceGenerator>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            namespace Macaron.InlineInterface.Tests;
+
+            public class NotAnInterface { }
+
+            public interface IUnsupported
+            {
+                void Write<T>(T value);
+            }
+
+            public interface IBuffer { }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<NotAnInterface>();
+                    _ = Implementation.Of<IUnsupported>();
+                    _ = Implementation.Of<IBuffer>();
+                }
+            }
+            """,
+            additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                diagnostics.Select(diagnostic => diagnostic.Id),
+                Has.Some.EqualTo("MII0001")
+            );
+            Assert.That(
+                diagnostics.Select(diagnostic => diagnostic.Id),
+                Has.Some.EqualTo("MII0003")
+            );
+            Assert.That(generatedCodes, Has.Length.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void ReportsDiagnosticWhenEventDelegateContainsOutParameter()
     {
         AssertDiagnostic(
@@ -115,7 +161,7 @@ public partial class InlineInterfaceGeneratorTests
 
             public interface ITest { }
 
-            public class Test { void M() => Implementation.Of<ITest?>(); }
+            public class Test { void M() { Implementation.Of<ITest?>(); } }
             """,
             expectedDiagnosticId: "MII0002"
         );
