@@ -8,6 +8,78 @@ namespace Macaron.InlineInterface.Tests;
 
 public partial class InlineInterfaceGeneratorTests
 {
+    [TestCase("Implementation.Of<IBuffer>()", true)]
+    [TestCase("Of<IBuffer>()", true)]
+    [TestCase("Implementation.@Of<IBuffer>()", true)]
+    [TestCase("Implementation.Of<IBuffer, IOther>()", false)]
+    [TestCase("Implementation.Create<IBuffer>()", false)]
+    [TestCase("Implementation.Of()", false)]
+    [TestCase("DoWork()", false)]
+    [TestCase("Implementation.Of<IBuffer>", false)]
+    public void TargetTypeExtractorIdentifiesCandidateInvocation(string sourceCode, bool expected)
+    {
+        var syntaxNode = SyntaxFactory.ParseExpression(sourceCode);
+
+        Assert.That(TargetTypeExtractor.IsCandidate(syntaxNode), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void TargetTypeExtractorIdentifiesImplementationType()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface
+            {
+                public static class Implementation<T> { }
+
+                public static class Container
+                {
+                    public static class Implementation { }
+                }
+            }
+
+            namespace Other
+            {
+                public static class Implementation { }
+            }
+            """,
+            additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                TargetTypeExtractor.IsImplementationType(GetNamedTypeSymbol(
+                    compilation,
+                    "Macaron.InlineInterface.Implementation"
+                )),
+                Is.True
+            );
+            Assert.That(
+                TargetTypeExtractor.IsImplementationType(GetNamedTypeSymbol(
+                    compilation,
+                    "Macaron.InlineInterface.Implementation`1"
+                )),
+                Is.False
+            );
+            Assert.That(
+                TargetTypeExtractor.IsImplementationType(GetNamedTypeSymbol(
+                    compilation,
+                    "Macaron.InlineInterface.Container+Implementation"
+                )),
+                Is.False
+            );
+            Assert.That(
+                TargetTypeExtractor.IsImplementationType(GetNamedTypeSymbol(
+                    compilation,
+                    "Other.Implementation"
+                )),
+                Is.False
+            );
+        });
+    }
+
     [Test]
     public void InterfaceValidatorReturnsContextsForSupportedInterface()
     {
@@ -191,7 +263,7 @@ public partial class InlineInterfaceGeneratorTests
         {
             var provider = context.SyntaxProvider
                 .CreateSyntaxProvider(
-                    predicate: static (node, _) => node is InvocationExpressionSyntax,
+                    predicate: static (node, _) => TargetTypeExtractor.IsCandidate(node),
                     transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
                 )
                 .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);

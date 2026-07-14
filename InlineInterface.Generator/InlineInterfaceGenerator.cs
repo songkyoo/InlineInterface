@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using static Macaron.InlineInterface.SourceGenerationHelpers;
 
@@ -14,7 +13,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
         var typeSymbolProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
-                predicate: static (syntaxNode, _) => syntaxNode is InvocationExpressionSyntax,
+                predicate: static (syntaxNode, _) => TargetTypeExtractor.IsCandidate(syntaxNode),
                 transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
             )
             .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);

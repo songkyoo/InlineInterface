@@ -27,6 +27,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
     {
         if (context.Node is not InvocationExpressionSyntax invocation ||
+            !TargetTypeExtractor.IsCandidate(invocation) ||
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation operation ||
             !TryGetImplementationOfTarget(operation, invocation, out var target)
         )
@@ -374,9 +375,9 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
     {
         target = default;
 
-        if (GetGenericNameFromInvocation(invocation) is not { } genericNameSyntax ||
+        if (TargetTypeExtractor.GetCandidateGenericName(invocation) is not { } genericNameSyntax ||
             operation.TargetMethod is not { IsStatic: true, Name: "Of" } methodSymbol ||
-            methodSymbol.ContainingType.ToDisplayString(FullyQualifiedFormat) != "global::Macaron.InlineInterface.Implementation" ||
+            !TargetTypeExtractor.IsImplementationType(methodSymbol.ContainingType) ||
             genericNameSyntax.TypeArgumentList.Arguments is not [{ } typeArgumentSyntax] ||
             methodSymbol.TypeArguments is not [{ } typeArgument] ||
             typeArgument is not INamedTypeSymbol interfaceSymbol
@@ -388,16 +389,6 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         target = new ImplementationOfTarget(interfaceSymbol, typeArgumentSyntax);
 
         return true;
-    }
-
-    private static GenericNameSyntax? GetGenericNameFromInvocation(InvocationExpressionSyntax invocation)
-    {
-        return invocation.Expression switch
-        {
-            MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName } => genericName,
-            GenericNameSyntax genericName => genericName,
-            _ => null,
-        };
     }
 
     private static string? GetInvokedMethodName(InvocationExpressionSyntax invocation)
