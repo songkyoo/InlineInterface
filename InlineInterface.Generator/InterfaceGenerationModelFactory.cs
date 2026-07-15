@@ -43,7 +43,7 @@ internal static class InterfaceGenerationModelFactory
         var propertySymbols = interfaceContexts.SelectMany(ctx => ctx.PropertySymbols).ToImmutableArray();
         var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
 
-        var interfaceTypeStringProvider = new InterfaceTypeStringProvider(genericParameterMap);
+        var interfaceTypeProvider = new InterfaceTypeProvider(genericParameterMap);
 
         var eventContextProvider = new EventContextProvider(
             eventSymbols,
@@ -58,7 +58,7 @@ internal static class InterfaceGenerationModelFactory
             {
                 eventImplementationBuilder.Add(new EventImplementationModel(
                     eventModelIndex,
-                    interfaceTypeStringProvider.GetInterfaceTypeName(eventSymbol.ContainingType)
+                    interfaceTypeProvider.GetIndex(eventSymbol.ContainingType)
                 ));
             }
         }
@@ -81,7 +81,7 @@ internal static class InterfaceGenerationModelFactory
             {
                 propertyImplementationBuilder.Add(new PropertyImplementationModel(
                     propertyModelIndex,
-                    interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType),
+                    interfaceTypeProvider.GetIndex(propertySymbol.ContainingType),
                     HasGetter: propertySymbol.GetMethod != null,
                     HasSetter: propertySymbol.SetMethod != null
                 ));
@@ -105,7 +105,7 @@ internal static class InterfaceGenerationModelFactory
             {
                 methodImplementationBuilder.Add(new MethodImplementationModel(
                     methodModelIndex,
-                    interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType)
+                    interfaceTypeProvider.GetIndex(methodSymbol.ContainingType)
                 ));
             }
         }
@@ -120,6 +120,7 @@ internal static class InterfaceGenerationModelFactory
             TypeBuilderNamespace: typeBuilderNamespace,
             TypeBuilder: typeBuilder,
             GlobalTypeBuilder: globalTypeBuilder,
+            InterfaceTypes: interfaceTypeProvider.ToImmutableArray(),
             Events: eventModels,
             EventImplementations: eventImplementations,
             Properties: propertyModels,

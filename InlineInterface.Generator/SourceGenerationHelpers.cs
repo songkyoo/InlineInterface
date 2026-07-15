@@ -20,15 +20,17 @@ internal static class SourceGenerationHelpers
         var typeBuilderNamespace = model.TypeBuilderNamespace;
         var typeBuilder = model.TypeBuilder;
         var globalTypeBuilder = model.GlobalTypeBuilder;
-        var eventCodeGenerator = new EventCodeGenerator(model.Events, Indent);
+        var eventCodeGenerator = new EventCodeGenerator(model.Events, model.InterfaceTypes, Indent);
         var hasEventMembers = model.Events.Length > 0;
         var propertyCodeGenerator = new PropertyCodeGenerator(
             model.Properties,
+            model.InterfaceTypes,
             typeBuilder,
             Indent
         );
         var methodCodeGenerator = new MethodCodeGenerator(
             model.Methods,
+            model.InterfaceTypes,
             typeBuilder,
             Indent
         );

@@ -4,6 +4,7 @@ namespace Macaron.InlineInterface;
 
 internal sealed class MethodCodeGenerator(
     ImmutableArray<MethodGenerationModel> methods,
+    ImmutableArray<string> interfaceTypes,
     string containingBuilderType,
     string indent
 )
@@ -75,9 +76,10 @@ internal sealed class MethodCodeGenerator(
     public string GetInterfaceImplementation(MethodImplementationModel implementation)
     {
         var context = methods[implementation.MethodIndex];
-        var memberDescription = CreateMessageLiteral($"method '{implementation.InterfaceType}.{context.Name}({context.Parameters})'");
+        var interfaceType = interfaceTypes[implementation.InterfaceTypeIndex];
+        var memberDescription = CreateMessageLiteral($"method '{interfaceType}.{context.Name}({context.Parameters})'");
 
-        return $"{context.ReturnType} {implementation.InterfaceType}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";
+        return $"{context.ReturnType} {interfaceType}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";
     }
 
     public IEnumerable<ImmutableArray<string>> GetExtensionMethodImplementation(

@@ -10,6 +10,7 @@ internal sealed record InterfaceGenerationModel(
     string TypeBuilderNamespace,
     string TypeBuilder,
     string GlobalTypeBuilder,
+    ImmutableArray<string> InterfaceTypes,
     ImmutableArray<EventGenerationModel> Events,
     ImmutableArray<EventImplementationModel> EventImplementations,
     ImmutableArray<PropertyGenerationModel> Properties,
@@ -39,6 +40,7 @@ internal sealed record InterfaceGenerationModel(
             && StringComparer.Ordinal.Equals(TypeBuilderNamespace, other.TypeBuilderNamespace)
             && StringComparer.Ordinal.Equals(TypeBuilder, other.TypeBuilder)
             && StringComparer.Ordinal.Equals(GlobalTypeBuilder, other.GlobalTypeBuilder)
+            && SequenceEqual(InterfaceTypes, other.InterfaceTypes, StringComparer.Ordinal)
             && SequenceEqual(Events, other.Events, EqualityComparer<EventGenerationModel>.Default)
             && SequenceEqual(
                 EventImplementations,
@@ -72,6 +74,7 @@ internal sealed record InterfaceGenerationModel(
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(TypeBuilderNamespace);
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(TypeBuilder);
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(GlobalTypeBuilder);
+            hashCode = AddValuesHashCode(hashCode, InterfaceTypes, StringComparer.Ordinal);
             hashCode = AddValuesHashCode(hashCode, Events, EqualityComparer<EventGenerationModel>.Default);
             hashCode = AddValuesHashCode(
                 hashCode,

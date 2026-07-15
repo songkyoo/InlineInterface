@@ -4,6 +4,7 @@ namespace Macaron.InlineInterface;
 
 internal sealed class EventCodeGenerator(
     ImmutableArray<EventGenerationModel> events,
+    ImmutableArray<string> interfaceTypes,
     string indent
 )
 {
@@ -44,9 +45,10 @@ internal sealed class EventCodeGenerator(
     public ImmutableArray<string> GetInterfaceImplementation(EventImplementationModel implementation)
     {
         var model = events[implementation.EventIndex];
+        var interfaceType = interfaceTypes[implementation.InterfaceTypeIndex];
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
-        implementationBuilder.Add($"event {model.Type} {implementation.InterfaceType}.{model.Name}");
+        implementationBuilder.Add($"event {model.Type} {interfaceType}.{model.Name}");
         implementationBuilder.Add("{");
         implementationBuilder.Add($"{indent}add => _eventCollection.{model.UniqueName} += value;");
         implementationBuilder.Add($"{indent}remove => _eventCollection.{model.UniqueName} -= value;");

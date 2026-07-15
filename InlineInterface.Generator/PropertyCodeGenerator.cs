@@ -4,6 +4,7 @@ namespace Macaron.InlineInterface;
 
 internal sealed class PropertyCodeGenerator(
     ImmutableArray<PropertyGenerationModel> properties,
+    ImmutableArray<string> interfaceTypes,
     string containingBuilderType,
     string indent
 )
@@ -210,6 +211,7 @@ internal sealed class PropertyCodeGenerator(
     public ImmutableArray<string> GetInterfaceImplementation(PropertyImplementationModel implementation)
     {
         var context = properties[implementation.PropertyIndex];
+        var interfaceType = interfaceTypes[implementation.InterfaceTypeIndex];
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
         var propertyName = context.IsIndexer ? "this" : context.Name;
@@ -217,14 +219,14 @@ internal sealed class PropertyCodeGenerator(
             ? $"[{context.Parameters}]"
             : "";
 
-        implementationBuilder.Add($"{context.Type} {implementation.InterfaceType}.{propertyName}{parameterList}");
+        implementationBuilder.Add($"{context.Type} {interfaceType}.{propertyName}{parameterList}");
         implementationBuilder.Add("{");
 
         if (implementation.HasGetter)
         {
             var getterArguments = context.Arguments;
             var getterMemberDescription = CreateInvocationMemberDescriptionLiteral(
-                implementation.InterfaceType,
+                interfaceType,
                 context,
                 "getter"
             );
@@ -238,7 +240,7 @@ internal sealed class PropertyCodeGenerator(
                 ? "value"
                 : $"{context.Arguments}, value";
             var setterMemberDescription = CreateInvocationMemberDescriptionLiteral(
-                implementation.InterfaceType,
+                interfaceType,
                 context,
                 "setter"
             );
