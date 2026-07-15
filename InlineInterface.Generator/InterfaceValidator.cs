@@ -133,7 +133,6 @@ internal static class InterfaceValidator
         }
 
         return new InterfaceMemberValidationResult(context: new InterfaceContext(
-            TypeSymbol: interfaceSymbol,
             EventSymbols: eventSymbolsBuilder.ToImmutable(),
             PropertySymbols: propertySymbolsBuilder.ToImmutable(),
             MethodSymbols: methodSymbolsBuilder.ToImmutable()
