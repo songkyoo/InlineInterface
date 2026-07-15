@@ -39,9 +39,7 @@ internal static class InterfaceGenerationModelFactory
         var typeBuilder = $"{mergedTypePrefix}Builder{genericParameters}";
         var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
 
-        var eventSymbols = interfaceContexts.SelectMany(ctx => ctx.EventSymbols).ToImmutableArray();
-        var propertySymbols = interfaceContexts.SelectMany(ctx => ctx.PropertySymbols).ToImmutableArray();
-        var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
+        var (eventSymbols, propertySymbols, methodSymbols) = CollectMemberSymbols(interfaceContexts);
 
         var interfaceTypeProvider = new InterfaceTypeProvider(genericParameterMap);
 
@@ -128,6 +126,30 @@ internal static class InterfaceGenerationModelFactory
             Methods: methodModels,
             MethodImplementations: methodImplementations,
             HintName: GetHintName(typeSymbol)
+        );
+    }
+
+    private static (
+        ImmutableArray<IEventSymbol> EventSymbols,
+        ImmutableArray<IPropertySymbol> PropertySymbols,
+        ImmutableArray<IMethodSymbol> MethodSymbols
+    ) CollectMemberSymbols(ImmutableArray<InterfaceContext> interfaceContexts)
+    {
+        var eventBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
+        var propertyBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
+        var methodBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+
+        foreach (var interfaceContext in interfaceContexts)
+        {
+            eventBuilder.AddRange(interfaceContext.EventSymbols);
+            propertyBuilder.AddRange(interfaceContext.PropertySymbols);
+            methodBuilder.AddRange(interfaceContext.MethodSymbols);
+        }
+
+        return (
+            EventSymbols: eventBuilder.ToImmutable(),
+            PropertySymbols: propertyBuilder.ToImmutable(),
+            MethodSymbols: methodBuilder.ToImmutable()
         );
     }
 
