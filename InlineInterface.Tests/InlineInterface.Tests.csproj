@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\InlineInterface.Core\InlineInterface.Core.csproj" />
+    <ProjectReference Include="..\InlineInterface\InlineInterface.csproj" />
     <ProjectReference Include="..\InlineInterface.Generator\InlineInterface.Generator.csproj" />
   </ItemGroup>
 

@@ -3,7 +3,6 @@
   <PropertyGroup>
     <AssemblyName>Macaron.InlineInterface</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>Macaron.InlineInterface</RootNamespace>
@@ -19,13 +18,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\InlineInterface.Core\InlineInterface.Core.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\InlineInterface.Generator\InlineInterface.Generator.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\InlineInterface.Generator\InlineInterface.Generator.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\InlineInterface.Core\bin\$(Configuration)\netstandard2.0\Macaron.InlineInterface.Core.dll" Pack="true" PackagePath="lib/netstandard2.0" />
-    <None Include="..\InlineInterface.Core\bin\$(Configuration)\netstandard2.0\Macaron.InlineInterface.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
     <None Include="..\InlineInterface.Generator\bin\$(Configuration)\netstandard2.0\Macaron.InlineInterface.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
   </ItemGroup>
 

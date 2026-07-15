@@ -1,4 +1,4 @@
-﻿namespace Macaron.InlineInterface;
+namespace Macaron.InlineInterface;
 
 public static class Implementation
 {
