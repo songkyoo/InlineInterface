@@ -1,10 +1,6 @@
-using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
-
-using static Macaron.InlineInterface.SymbolHelpers;
-using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Macaron.InlineInterface;
 
@@ -14,74 +10,25 @@ internal static class SourceGenerationHelpers
 
     public static void AddSource(
         SourceProductionContext context,
-        INamedTypeSymbol typeSymbol,
-        ImmutableArray<InterfaceContext> interfaceContexts
+        InterfaceGenerationModel model
     )
     {
-        var (
-            type,
-            genericParameters,
-            genericParameterConstraints,
-            genericParameterMap
-        ) = GetTypeStrings(typeSymbol);
-
-        // get nested types
-        var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
-        var containingType = GetContainingType(typeSymbol);
-
-        while (containingType != null)
-        {
-            nestedTypeNames.Add(GetTypeName(containingType));
-            containingType = GetContainingType(containingType);
-        }
-
-        nestedTypeNames.Reverse();
-
-        var mergedTypePrefix = string.Join("_", nestedTypeNames);
-        var typeBuilderNamespace = $"Macaron.InlineInterface.Generated{GetNamespaceString(typeSymbol)}";
-        var typeBuilder = $"{mergedTypePrefix}Builder{genericParameters}";
-        var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
-
-        var eventSymbols = interfaceContexts.SelectMany(ctx => ctx.EventSymbols).ToImmutableArray();
-        var propertySymbols = interfaceContexts.SelectMany(ctx => ctx.PropertySymbols).ToImmutableArray();
-        var methodSymbols = interfaceContexts.SelectMany(ctx => ctx.MethodSymbols).ToImmutableArray();
-
-        var interfaceTypeStringProvider = new InterfaceTypeStringProvider(genericParameterMap);
-
-        var eventContextProvider = new EventContextProvider(
-            eventSymbols,
-            genericParameterMap
-        );
-        var eventCodeGenerator = new EventCodeGenerator(
-            eventContextProvider,
-            interfaceTypeStringProvider,
-            genericParameterMap,
-            Indent
-        );
-        var hasEventMembers = eventContextProvider.Contexts.Any();
-
-        var propertyContextProvider = new PropertyContextProvider(
-            propertySymbols,
-            genericParameterMap,
-            globalTypeBuilder,
-            hasEventMembers
-        );
+        var type = model.Type;
+        var genericParameters = model.GenericParameters;
+        var genericParameterConstraints = model.GenericParameterConstraints;
+        var mergedTypePrefix = model.MergedTypePrefix;
+        var typeBuilderNamespace = model.TypeBuilderNamespace;
+        var typeBuilder = model.TypeBuilder;
+        var globalTypeBuilder = model.GlobalTypeBuilder;
+        var eventCodeGenerator = new EventCodeGenerator(model.Events, Indent);
+        var hasEventMembers = model.Events.Length > 0;
         var propertyCodeGenerator = new PropertyCodeGenerator(
-            propertyContextProvider,
-            interfaceTypeStringProvider,
+            model.Properties,
             typeBuilder,
             Indent
         );
-
-        var methodContextProvider = new MethodContextProvider(
-            methodSymbols,
-            genericParameterMap,
-            globalTypeBuilder,
-            hasEventMembers
-        );
         var methodCodeGenerator = new MethodCodeGenerator(
-            methodContextProvider,
-            interfaceTypeStringProvider,
+            model.Methods,
             typeBuilder,
             Indent
         );
@@ -222,31 +169,31 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}}}");
 
         // impl event implementations
-        foreach (var eventSymbol in eventSymbols)
+        foreach (var eventImplementation in model.EventImplementations)
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in eventCodeGenerator.GetInterfaceImplementation(eventSymbol))
+            foreach (var line in eventCodeGenerator.GetInterfaceImplementation(eventImplementation))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
         }
 
         // impl property implementations
-        foreach (var propertySymbol in propertySymbols)
+        foreach (var propertyImplementation in model.PropertyImplementations)
         {
             stringBuilder.AppendLine();
 
-            foreach (var line in propertyCodeGenerator.GetInterfaceImplementation(propertySymbol))
+            foreach (var line in propertyCodeGenerator.GetInterfaceImplementation(propertyImplementation))
             {
                 stringBuilder.AppendLine($"{depthSpacerText}{line}");
             }
         }
 
         // impl method implementations
-        foreach (var methodSymbol in methodSymbols)
+        foreach (var methodImplementation in model.MethodImplementations)
         {
-            var line = methodCodeGenerator.GetInterfaceImplementation(methodSymbol);
+            var line = methodCodeGenerator.GetInterfaceImplementation(methodImplementation);
 
             stringBuilder.AppendLine();
             stringBuilder.AppendLine($"{depthSpacerText}{line}");
@@ -449,26 +396,9 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine($"}}");
 
         context.AddSource(
-            hintName: GetHintName(typeSymbol),
+            hintName: model.HintName,
             sourceText: SourceText.From(stringBuilder.ToString(), Encoding.UTF8)
         );
-
-        #region Local Functions
-        static string GetNamespaceString(INamedTypeSymbol typeSymbol)
-        {
-            return typeSymbol.ContainingNamespace is { IsGlobalNamespace: false } ns ? $".{ns.ToDisplayString()}" : "";
-        }
-
-        static INamedTypeSymbol? GetContainingType(INamedTypeSymbol typeSymbol)
-        {
-            return typeSymbol.ContainingType?.ConstructedFrom ?? typeSymbol.ContainingType;
-        }
-
-        static string GetTypeName(INamedTypeSymbol typeSymbol)
-        {
-            return $"{typeSymbol.Name}{(typeSymbol.Arity > 0 ? $"_{typeSymbol.Arity}" : "")}";
-        }
-        #endregion
     }
 
     private static StringBuilder CreateStringBuilderWithFileHeader()
@@ -479,94 +409,6 @@ internal static class SourceGenerationHelpers
         stringBuilder.AppendLine();
 
         return stringBuilder;
-    }
-
-    private static (
-        string Type,
-        string GenericParameters,
-        ImmutableArray<string> GenericParameterConstraints,
-        ImmutableDictionary<ITypeParameterSymbol, string> GenericParameterMap
-    ) GetTypeStrings(INamedTypeSymbol typeSymbol)
-    {
-        var typeSymbols = GetNestedTypeSymbols(typeSymbol);
-        var typeParameters = typeSymbols
-            .SelectMany(static symbol => symbol.TypeParameters)
-            .ToArray();
-
-        var genericParameterMap = CreateGenericParameterMap(typeSymbols);
-
-        var genericParameterConstraints = typeParameters
-            .Select(symbol => GetTypeParameterConstraintClause(
-                typeParameterSymbol: symbol,
-                typeParameterNameSelector: symbol2 => genericParameterMap[symbol2],
-                typeStringSelector: type => GetTypeString(type, genericParameterMap)
-            ))
-            .Where(static clause => clause.Length > 0)
-            .ToImmutableArray();
-
-        var type = GetTypeString(typeSymbol, genericParameterMap);
-
-        var genericParameters = typeParameters.Length > 0
-            ? $"<{string.Join(", ", typeParameters.Select(symbol => genericParameterMap[symbol]))}>"
-            : "";
-
-        return (
-            Type: type,
-            GenericParameters: genericParameters,
-            GenericParameterConstraints: genericParameterConstraints,
-            GenericParameterMap: genericParameterMap
-        );
-
-        #region Local Functions
-        static ImmutableDictionary<ITypeParameterSymbol, string> CreateGenericParameterMap(
-            ImmutableArray<INamedTypeSymbol> typeSymbols
-        )
-        {
-            var builder = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, string>(
-                SymbolEqualityComparer.Default
-            );
-
-            if (!HasDuplicatedTypeParameterName(typeSymbols))
-            {
-                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
-                {
-                    builder.Add(typeParameter, typeParameter.Name);
-                }
-            }
-            else
-            {
-                var index = 0;
-
-                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
-                {
-                    builder.Add(typeParameter, $"T{index}");
-                    index += 1;
-                }
-            }
-
-            return builder.ToImmutable();
-        }
-        #endregion
-    }
-
-    private static string GetHintName(INamedTypeSymbol typeSymbol)
-    {
-        var assemblyName = typeSymbol.ContainingAssembly != null ? $"{typeSymbol.ContainingAssembly}" : "";
-        var qualifiedName = typeSymbol.ToDisplayString(FullyQualifiedFormat);
-
-        const uint fnvPrime = 16777619;
-        const uint offsetBasis = 2166136261;
-
-        var bytes = Encoding.UTF8.GetBytes($"{assemblyName}, {qualifiedName}");
-        uint hash = offsetBasis;
-
-        foreach (var b in bytes)
-        {
-            hash ^= b;
-            hash *= fnvPrime;
-        }
-
-        return $"{typeSymbol.Name}_{typeSymbol.Arity}.{hash:x8}.g.cs";
     }
 
     private static string ToStringLiteral(string value)

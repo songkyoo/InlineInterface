@@ -1,18 +1,16 @@
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-public sealed class PropertyCodeGenerator(
-    PropertyContextProvider propertyContextProvider,
-    InterfaceTypeStringProvider interfaceTypeStringProvider,
+internal sealed class PropertyCodeGenerator(
+    ImmutableArray<PropertyGenerationModel> properties,
     string containingBuilderType,
     string indent
 )
 {
     public IEnumerable<string> GetImplFieldDeclarations()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -36,7 +34,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetImplConstructorParameterFragments()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -60,7 +58,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetImplConstructorAssignments()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -84,7 +82,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetBuilderFieldDeclarations()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -108,7 +106,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetBuilderConstructorParameterFragments()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -132,7 +130,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetBuilderConstructorAssignments()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -156,7 +154,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetBuilderMethodImplementation(string typeBuilder)
     {
-        foreach (var context in propertyContextProvider.Contexts)
+        foreach (var context in properties)
         {
             var parameters = new List<string>();
             var expressions = new List<string>();
@@ -187,7 +185,7 @@ public sealed class PropertyCodeGenerator(
 
     public IEnumerable<string> GetBuildArgumentFragments()
     {
-        foreach (var propertyContext in propertyContextProvider.Contexts)
+        foreach (var propertyContext in properties)
         {
             if (propertyContext is
             {
@@ -209,38 +207,41 @@ public sealed class PropertyCodeGenerator(
         }
     }
 
-    public ImmutableArray<string> GetInterfaceImplementation(IPropertySymbol propertySymbol)
+    public ImmutableArray<string> GetInterfaceImplementation(PropertyImplementationModel implementation)
     {
-        if (!propertyContextProvider.TryGetPropertyContext(propertySymbol, out var context))
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType);
+        var context = implementation.Property;
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
         var propertyName = context.IsIndexer ? "this" : context.Name;
-        var parameterList = context.ParameterSymbols.Length > 0
+        var parameterList = context.HasParameters
             ? $"[{context.Parameters}]"
             : "";
 
-        implementationBuilder.Add($"{context.Type} {interfaceTypeString}.{propertyName}{parameterList}");
+        implementationBuilder.Add($"{context.Type} {implementation.InterfaceType}.{propertyName}{parameterList}");
         implementationBuilder.Add("{");
 
-        if (propertySymbol.GetMethod != null)
+        if (implementation.HasGetter)
         {
             var getterArguments = context.Arguments;
-            var getterMemberDescription = CreateInvocationMemberDescriptionLiteral(interfaceTypeString, context, "getter");
+            var getterMemberDescription = CreateInvocationMemberDescriptionLiteral(
+                implementation.InterfaceType,
+                context,
+                "getter"
+            );
 
             implementationBuilder.Add($"{indent}get => ({context.GetterFieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({getterMemberDescription}))({getterArguments});");
         }
 
-        if (propertySymbol.SetMethod != null)
+        if (implementation.HasSetter)
         {
             var setterArguments = string.IsNullOrEmpty(context.Arguments)
                 ? "value"
                 : $"{context.Arguments}, value";
-            var setterMemberDescription = CreateInvocationMemberDescriptionLiteral(interfaceTypeString, context, "setter");
+            var setterMemberDescription = CreateInvocationMemberDescriptionLiteral(
+                implementation.InterfaceType,
+                context,
+                "setter"
+            );
 
             implementationBuilder.Add($"{indent}set => ({context.SetterFieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({setterMemberDescription}))({setterArguments});");
         }
@@ -257,7 +258,7 @@ public sealed class PropertyCodeGenerator(
         ImmutableArray<string> genericParameterConstraints
     )
     {
-        foreach (var context in propertyContextProvider.Contexts)
+        foreach (var context in properties)
         {
             var parameters = new List<string>();
             var expressions = new List<string>();
@@ -309,7 +310,7 @@ public sealed class PropertyCodeGenerator(
         }
     }
 
-    private static string CreateBuildMemberDescriptionLiteral(PropertyContext context, string accessor)
+    private static string CreateBuildMemberDescriptionLiteral(PropertyGenerationModel context, string accessor)
     {
         var memberDescription = context.IsIndexer
             ? $"indexer '{CreateIndexerSignature(context.Parameters)}' ({accessor})"
@@ -320,7 +321,7 @@ public sealed class PropertyCodeGenerator(
 
     private static string CreateInvocationMemberDescriptionLiteral(
         string interfaceTypeString,
-        PropertyContext context,
+        PropertyGenerationModel context,
         string accessor
     )
     {

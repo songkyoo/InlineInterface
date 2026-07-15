@@ -63,16 +63,19 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 }
             }
         );
-        context.RegisterSourceOutput(
-            source: validatedProvider
-                .Where(static result => result is TargetInterfaceValidationResult.Success)
-                .Select(static (result, _) => (TargetInterfaceValidationResult.Success)result),
-            action: static (sourceProductionContext, success) =>
-            {
-                var (interfaceSymbol, contexts) = success;
 
-                AddSource(sourceProductionContext, interfaceSymbol, contexts);
-            }
+        var generationModelProvider = validatedProvider
+            .Where(static result => result is TargetInterfaceValidationResult.Success)
+            .Select(static (result, _) => (TargetInterfaceValidationResult.Success)result)
+            .Select(static (success, _) => InterfaceGenerationModelFactory.Create(
+                success.InterfaceSymbol,
+                success.Contexts
+            ))
+            .WithTrackingName(nameof(InterfaceGenerationModel));
+
+        context.RegisterSourceOutput(
+            source: generationModelProvider,
+            action: static (sourceProductionContext, model) => AddSource(sourceProductionContext, model)
         );
     }
 }

@@ -1,18 +1,16 @@
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-public sealed class MethodCodeGenerator(
-    MethodContextProvider methodContextProvider,
-    InterfaceTypeStringProvider interfaceTypeStringProvider,
+internal sealed class MethodCodeGenerator(
+    ImmutableArray<MethodGenerationModel> methods,
     string containingBuilderType,
     string indent
 )
 {
     public IEnumerable<string> GetImplFieldDeclarations()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"private readonly {methodContext.DelegateType}? {methodContext.FieldName};";
         }
@@ -20,7 +18,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetImplConstructorParameterFragments()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"{methodContext.DelegateType}? {methodContext.ParameterName}";
         }
@@ -28,7 +26,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetImplConstructorAssignments()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"{methodContext.FieldName} = {methodContext.ParameterName};";
         }
@@ -36,7 +34,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetBuilderFieldDeclarations()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"private readonly {methodContext.DelegateType}? {methodContext.UniqueName} {{ get; init; }} = null;";
         }
@@ -44,7 +42,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetBuilderConstructorParameterFragments()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"{methodContext.DelegateType}? {methodContext.ParameterName} = null";
         }
@@ -52,7 +50,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetBuilderConstructorAssignments()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"{methodContext.UniqueName} = {methodContext.ParameterName};";
         }
@@ -60,7 +58,7 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetBuilderMethodImplementation(string typeBuilder)
     {
-        foreach (var context in methodContextProvider.Contexts)
+        foreach (var context in methods)
         {
             yield return $"public {typeBuilder} {context.Name}({context.DelegateType} impl) => this with {{ {context.UniqueName} = impl }};";
         }
@@ -68,23 +66,18 @@ public sealed class MethodCodeGenerator(
 
     public IEnumerable<string> GetBuildArgumentFragments()
     {
-        foreach (var methodContext in methodContextProvider.Contexts)
+        foreach (var methodContext in methods)
         {
             yield return $"{methodContext.ParameterName}: {methodContext.UniqueName} ?? (_allowMissingImplementation ? null : throw CreateMissingBuildDelegateException({CreateMessageLiteral($"method '{methodContext.Name}({methodContext.Parameters})'")}))";
         }
     }
 
-    public string GetInterfaceImplementation(IMethodSymbol methodSymbol)
+    public string GetInterfaceImplementation(MethodImplementationModel implementation)
     {
-        if (!methodContextProvider.TryGetMethodContext(methodSymbol, out var context))
-        {
-            return "";
-        }
+        var context = implementation.Method;
+        var memberDescription = CreateMessageLiteral($"method '{implementation.InterfaceType}.{context.Name}({context.Parameters})'");
 
-        var interfaceTypeString = interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType);
-        var memberDescription = CreateMessageLiteral($"method '{interfaceTypeString}.{context.Name}({context.Parameters})'");
-
-        return $"{context.ReturnType} {interfaceTypeString}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";
+        return $"{context.ReturnType} {implementation.InterfaceType}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";
     }
 
     public IEnumerable<ImmutableArray<string>> GetExtensionMethodImplementation(
@@ -94,7 +87,7 @@ public sealed class MethodCodeGenerator(
         ImmutableArray<string> genericParameterConstraints
     )
     {
-        foreach (var context in methodContextProvider.Contexts)
+        foreach (var context in methods)
         {
             var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
