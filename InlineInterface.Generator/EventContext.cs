@@ -2,9 +2,7 @@
 
 namespace Macaron.InlineInterface;
 
-public sealed record EventContext(
+internal sealed record EventContext(
     INamedTypeSymbol TypeSymbol,
-    string Type,
-    string Name,
-    string UniqueName
+    EventGenerationModel Model
 );

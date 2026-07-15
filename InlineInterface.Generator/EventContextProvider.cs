@@ -2,9 +2,11 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
+using static Macaron.InlineInterface.ParameterStringHelpers;
+
 namespace Macaron.InlineInterface;
 
-public sealed class EventContextProvider(
+internal sealed class EventContextProvider(
     IEnumerable<IEventSymbol> eventSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
 )
@@ -49,11 +51,16 @@ public sealed class EventContextProvider(
                 type += "?";
             }
 
+            var uniqueName = $"{eventName}_{contexts.Count}";
             var newContext = new EventContext(
                 TypeSymbol: typeSymbol,
-                Type: type,
-                Name: eventName,
-                UniqueName: $"{eventName}_{contexts.Count}"
+                Model: CreateGenerationModel(
+                    typeSymbol,
+                    type,
+                    eventName,
+                    uniqueName,
+                    genericParameterMap
+                )
             );
 
             contexts.Add(newContext);
@@ -62,6 +69,52 @@ public sealed class EventContextProvider(
         return builder.ToImmutableSortedDictionary(
             keySelector: x => x.Key,
             elementSelector: x => x.Value.ToImmutableArray()
+        );
+    }
+
+    private static EventGenerationModel CreateGenerationModel(
+        INamedTypeSymbol typeSymbol,
+        string type,
+        string name,
+        string uniqueName,
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
+    )
+    {
+        var methodSymbol = typeSymbol.DelegateInvokeMethod!;
+        var parameters = new List<string>();
+        var arguments = new List<string>();
+
+        foreach (var parameterSymbol in methodSymbol.Parameters)
+        {
+            var (parameterType, parameterName) = GetParameterString(
+                parameterSymbol,
+                genericParameterMap,
+                includeModifier: true
+            );
+
+            parameters.Add($"{parameterType} {parameterName}");
+            arguments.Add(GetArgumentString(parameterSymbol, includeModifier: true));
+        }
+
+        if (!methodSymbol.ReturnsVoid)
+        {
+            var returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
+
+            if (!returnType.EndsWith("?"))
+            {
+                returnType += "?";
+            }
+
+            parameters.Add($"out {returnType} @return");
+        }
+
+        return new EventGenerationModel(
+            Type: type,
+            Name: name,
+            UniqueName: uniqueName,
+            DispatcherParameters: string.Join(", ", parameters),
+            DispatcherArguments: string.Join(", ", arguments),
+            ReturnsVoid: methodSymbol.ReturnsVoid
         );
     }
     #endregion
@@ -74,15 +127,21 @@ public sealed class EventContextProvider(
     #endregion
 
     #region Properties
-    public IEnumerable<EventContext> Contexts => _cache.Values.SelectMany(x => x);
+    public IEnumerable<EventGenerationModel> Models => _cache
+        .Values
+        .SelectMany(static contexts => contexts)
+        .Select(static context => context.Model);
     #endregion
 
     #region Methods
-    public bool TryGetEventContext(IEventSymbol eventSymbol, [NotNullWhen(returnValue: true)]out EventContext? context)
+    public bool TryGetEventModel(
+        IEventSymbol eventSymbol,
+        [NotNullWhen(returnValue: true)]out EventGenerationModel? model
+    )
     {
         if (!_cache.TryGetValue(eventSymbol.Name, out var contexts))
         {
-            context = null;
+            model = null;
 
             return false;
         }
@@ -101,12 +160,12 @@ public sealed class EventContextProvider(
 
         if (index == -1)
         {
-            context = null;
+            model = null;
 
             return false;
         }
 
-        context = contexts[index];
+        model = contexts[index].Model;
 
         return true;
     }

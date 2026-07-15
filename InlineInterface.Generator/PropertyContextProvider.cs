@@ -6,7 +6,7 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-public sealed class PropertyContextProvider(
+internal sealed class PropertyContextProvider(
     IEnumerable<IPropertySymbol> propertySymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,
@@ -39,7 +39,7 @@ public sealed class PropertyContextProvider(
             {
                 if (MatchesPropertySignature(
                     propertySymbol,
-                    contexts[i].Name,
+                    contexts[i].Model.Name,
                     contexts[i].TypeSymbol,
                     contexts[i].ParameterSymbols
                 ))
@@ -71,18 +71,22 @@ public sealed class PropertyContextProvider(
                     index
                 );
 
+                var existingModel = existing.Model;
+                var createdModel = created.Model;
+
                 contexts[index] = existing with
                 {
-                    RequiresGetter = existing.RequiresGetter || created.RequiresGetter,
-                    RequiresSetter = existing.RequiresSetter || created.RequiresSetter,
-                    GetterDelegateType = existing.GetterDelegateType ?? created.GetterDelegateType,
-                    SetterDelegateType = existing.SetterDelegateType ?? created.SetterDelegateType,
-                    GetterName = existing.GetterName ?? created.GetterName,
-                    SetterName = existing.SetterName ?? created.SetterName,
-                    GetterParameterName = existing.GetterParameterName ?? created.GetterParameterName,
-                    SetterParameterName = existing.SetterParameterName ?? created.SetterParameterName,
-                    GetterFieldName = existing.GetterFieldName ?? created.GetterFieldName,
-                    SetterFieldName = existing.SetterFieldName ?? created.SetterFieldName,
+                    Model = existingModel with
+                    {
+                        GetterDelegateType = existingModel.GetterDelegateType ?? createdModel.GetterDelegateType,
+                        SetterDelegateType = existingModel.SetterDelegateType ?? createdModel.SetterDelegateType,
+                        GetterName = existingModel.GetterName ?? createdModel.GetterName,
+                        SetterName = existingModel.SetterName ?? createdModel.SetterName,
+                        GetterParameterName = existingModel.GetterParameterName ?? createdModel.GetterParameterName,
+                        SetterParameterName = existingModel.SetterParameterName ?? createdModel.SetterParameterName,
+                        GetterFieldName = existingModel.GetterFieldName ?? createdModel.GetterFieldName,
+                        SetterFieldName = existingModel.SetterFieldName ?? createdModel.SetterFieldName,
+                    },
                 };
             }
         }
@@ -227,22 +231,23 @@ public sealed class PropertyContextProvider(
         return new PropertyContext(
             TypeSymbol: propertySymbol.Type,
             ParameterSymbols: propertySymbol.Parameters,
-            IsIndexer: isIndexer,
-            Type: propertyType,
-            Name: propertySymbol.Name,
-            ApiName: apiName,
-            Parameters: parameterList,
-            Arguments: argumentList,
-            RequiresGetter: propertySymbol.GetMethod != null,
-            RequiresSetter: propertySymbol.SetMethod != null,
-            GetterDelegateType: getterDelegateType,
-            SetterDelegateType: setterDelegateType,
-            GetterName: getterName,
-            SetterName: setterName,
-            GetterParameterName: getterParameterName,
-            SetterParameterName: setterParameterName,
-            GetterFieldName: getterFieldName,
-            SetterFieldName: setterFieldName
+            Model: new PropertyGenerationModel(
+                IsIndexer: isIndexer,
+                Type: propertyType,
+                Name: propertySymbol.Name,
+                ApiName: apiName,
+                Parameters: parameterList,
+                Arguments: argumentList,
+                GetterDelegateType: getterDelegateType,
+                SetterDelegateType: setterDelegateType,
+                GetterName: getterName,
+                SetterName: setterName,
+                GetterParameterName: getterParameterName,
+                SetterParameterName: setterParameterName,
+                GetterFieldName: getterFieldName,
+                SetterFieldName: setterFieldName,
+                HasParameters: propertySymbol.Parameters.Length > 0
+            )
         );
     }
     #endregion
@@ -257,18 +262,20 @@ public sealed class PropertyContextProvider(
     #endregion
 
     #region Properties
-    public IEnumerable<PropertyContext> Contexts => _cache.Values.SelectMany(x => x);
+    public IEnumerable<PropertyGenerationModel> Models => _cache.Values
+        .SelectMany(static contexts => contexts)
+        .Select(static context => context.Model);
     #endregion
 
     #region Methods
-    public bool TryGetPropertyContext(
+    public bool TryGetPropertyModel(
         IPropertySymbol propertySymbol,
-        [NotNullWhen(returnValue: true)] out PropertyContext? context
+        [NotNullWhen(returnValue: true)] out PropertyGenerationModel? model
     )
     {
         if (!_cache.TryGetValue(propertySymbol.Name, out var contexts))
         {
-            context = null;
+            model = null;
 
             return false;
         }
@@ -279,7 +286,7 @@ public sealed class PropertyContextProvider(
         {
             if (MatchesPropertySignature(
                 propertySymbol,
-                contexts[i].Name,
+                contexts[i].Model.Name,
                 contexts[i].TypeSymbol,
                 contexts[i].ParameterSymbols
             ))
@@ -292,12 +299,12 @@ public sealed class PropertyContextProvider(
 
         if (index == -1)
         {
-            context = null;
+            model = null;
 
             return false;
         }
 
-        context = contexts[index];
+        model = contexts[index].Model;
 
         return true;
     }

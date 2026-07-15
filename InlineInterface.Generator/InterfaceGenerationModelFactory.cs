@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 
-using static Macaron.InlineInterface.ParameterStringHelpers;
 using static Macaron.InlineInterface.SymbolHelpers;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -50,21 +49,15 @@ internal static class InterfaceGenerationModelFactory
             eventSymbols,
             genericParameterMap
         );
-        var eventContexts = eventContextProvider.Contexts.ToImmutableArray();
-        var eventModels = eventContexts
-            .Select(context => CreateEventGenerationModel(context, genericParameterMap))
-            .ToImmutableArray();
-        var eventModelMap = eventContexts
-            .Zip(eventModels, static (context, model) => (context, model))
-            .ToDictionary(static pair => pair.context, static pair => pair.model);
+        var eventModels = eventContextProvider.Models.ToImmutableArray();
         var eventImplementationBuilder = ImmutableArray.CreateBuilder<EventImplementationModel>();
 
         foreach (var eventSymbol in eventSymbols)
         {
-            if (eventContextProvider.TryGetEventContext(eventSymbol, out var eventContext))
+            if (eventContextProvider.TryGetEventModel(eventSymbol, out var eventModel))
             {
                 eventImplementationBuilder.Add(new EventImplementationModel(
-                    eventModelMap[eventContext],
+                    eventModel,
                     interfaceTypeStringProvider.GetInterfaceTypeName(eventSymbol.ContainingType)
                 ));
             }
@@ -79,21 +72,15 @@ internal static class InterfaceGenerationModelFactory
             globalTypeBuilder,
             hasEventMembers
         );
-        var propertyContexts = propertyContextProvider.Contexts.ToImmutableArray();
-        var propertyModels = propertyContexts
-            .Select(CreatePropertyGenerationModel)
-            .ToImmutableArray();
-        var propertyModelMap = propertyContexts
-            .Zip(propertyModels, static (context, model) => (context, model))
-            .ToDictionary(static pair => pair.context, static pair => pair.model);
+        var propertyModels = propertyContextProvider.Models.ToImmutableArray();
         var propertyImplementationBuilder = ImmutableArray.CreateBuilder<PropertyImplementationModel>();
 
         foreach (var propertySymbol in propertySymbols)
         {
-            if (propertyContextProvider.TryGetPropertyContext(propertySymbol, out var propertyContext))
+            if (propertyContextProvider.TryGetPropertyModel(propertySymbol, out var propertyModel))
             {
                 propertyImplementationBuilder.Add(new PropertyImplementationModel(
-                    propertyModelMap[propertyContext],
+                    propertyModel,
                     interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType),
                     HasGetter: propertySymbol.GetMethod != null,
                     HasSetter: propertySymbol.SetMethod != null
@@ -109,21 +96,15 @@ internal static class InterfaceGenerationModelFactory
             globalTypeBuilder,
             hasEventMembers
         );
-        var methodContexts = methodContextProvider.Contexts.ToImmutableArray();
-        var methodModels = methodContexts
-            .Select(CreateMethodGenerationModel)
-            .ToImmutableArray();
-        var methodModelMap = methodContexts
-            .Zip(methodModels, static (context, model) => (context, model))
-            .ToDictionary(static pair => pair.context, static pair => pair.model);
+        var methodModels = methodContextProvider.Models.ToImmutableArray();
         var methodImplementationBuilder = ImmutableArray.CreateBuilder<MethodImplementationModel>();
 
         foreach (var methodSymbol in methodSymbols)
         {
-            if (methodContextProvider.TryGetMethodContext(methodSymbol, out var methodContext))
+            if (methodContextProvider.TryGetMethodModel(methodSymbol, out var methodModel))
             {
                 methodImplementationBuilder.Add(new MethodImplementationModel(
-                    methodModelMap[methodContext],
+                    methodModel,
                     interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType)
                 ));
             }
@@ -146,84 +127,6 @@ internal static class InterfaceGenerationModelFactory
             Methods: methodModels,
             MethodImplementations: methodImplementations,
             HintName: GetHintName(typeSymbol)
-        );
-    }
-
-    private static EventGenerationModel CreateEventGenerationModel(
-        EventContext context,
-        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
-    )
-    {
-        var methodSymbol = context.TypeSymbol.DelegateInvokeMethod!;
-        var parameters = new List<string>();
-        var arguments = new List<string>();
-
-        foreach (var parameterSymbol in methodSymbol.Parameters)
-        {
-            var (type, name) = GetParameterString(
-                parameterSymbol,
-                genericParameterMap,
-                includeModifier: true
-            );
-
-            parameters.Add($"{type} {name}");
-            arguments.Add(GetArgumentString(parameterSymbol, includeModifier: true));
-        }
-
-        if (!methodSymbol.ReturnsVoid)
-        {
-            var returnType = GetTypeString(methodSymbol.ReturnType, genericParameterMap);
-
-            if (!returnType.EndsWith("?"))
-            {
-                returnType += "?";
-            }
-
-            parameters.Add($"out {returnType} @return");
-        }
-
-        return new EventGenerationModel(
-            Type: context.Type,
-            Name: context.Name,
-            UniqueName: context.UniqueName,
-            DispatcherParameters: string.Join(", ", parameters),
-            DispatcherArguments: string.Join(", ", arguments),
-            ReturnsVoid: methodSymbol.ReturnsVoid
-        );
-    }
-
-    private static PropertyGenerationModel CreatePropertyGenerationModel(PropertyContext context)
-    {
-        return new PropertyGenerationModel(
-            IsIndexer: context.IsIndexer,
-            Type: context.Type,
-            Name: context.Name,
-            ApiName: context.ApiName,
-            Parameters: context.Parameters,
-            Arguments: context.Arguments,
-            GetterDelegateType: context.GetterDelegateType,
-            SetterDelegateType: context.SetterDelegateType,
-            GetterName: context.GetterName,
-            SetterName: context.SetterName,
-            GetterParameterName: context.GetterParameterName,
-            SetterParameterName: context.SetterParameterName,
-            GetterFieldName: context.GetterFieldName,
-            SetterFieldName: context.SetterFieldName,
-            HasParameters: context.ParameterSymbols.Length > 0
-        );
-    }
-
-    private static MethodGenerationModel CreateMethodGenerationModel(MethodContext context)
-    {
-        return new MethodGenerationModel(
-            ReturnType: context.ReturnType,
-            Parameters: context.Parameters,
-            Arguments: context.Arguments,
-            DelegateType: context.DelegateType,
-            Name: context.Name,
-            UniqueName: context.UniqueName,
-            ParameterName: context.ParameterName,
-            FieldName: context.FieldName
         );
     }
 

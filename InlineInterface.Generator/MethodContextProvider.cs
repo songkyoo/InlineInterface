@@ -6,7 +6,7 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-public sealed class MethodContextProvider(
+internal sealed class MethodContextProvider(
     IEnumerable<IMethodSymbol> methodSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,
@@ -84,14 +84,16 @@ public sealed class MethodContextProvider(
             var newContext = new MethodContext(
                 ReturnTypeSymbol: methodSymbol.ReturnType,
                 ParameterTypeSymbols: methodSymbol.Parameters,
-                ReturnType: returnType,
-                Parameters: string.Join(", ", parameters),
-                Arguments: string.Join(", ", arguments),
-                DelegateType: delegateType,
-                Name: methodName,
-                UniqueName: uniqueName,
-                ParameterName: parameterName,
-                FieldName: fieldName
+                Model: new MethodGenerationModel(
+                    ReturnType: returnType,
+                    Parameters: string.Join(", ", parameters),
+                    Arguments: string.Join(", ", arguments),
+                    DelegateType: delegateType,
+                    Name: methodName,
+                    UniqueName: uniqueName,
+                    ParameterName: parameterName,
+                    FieldName: fieldName
+                )
             );
 
             contexts.Add(newContext);
@@ -156,18 +158,20 @@ public sealed class MethodContextProvider(
     #endregion
 
     #region Properties
-    public IEnumerable<MethodContext> Contexts => _cache.Values.SelectMany(x => x);
+    public IEnumerable<MethodGenerationModel> Models => _cache.Values
+        .SelectMany(static contexts => contexts)
+        .Select(static context => context.Model);
     #endregion
 
     #region Methods
-    public bool TryGetMethodContext(
+    public bool TryGetMethodModel(
         IMethodSymbol methodSymbol,
-        [NotNullWhen(returnValue: true)]out MethodContext? context
+        [NotNullWhen(returnValue: true)]out MethodGenerationModel? model
     )
     {
         if (!_cache.TryGetValue(methodSymbol.Name, out var contexts))
         {
-            context = null;
+            model = null;
 
             return false;
         }
@@ -186,12 +190,12 @@ public sealed class MethodContextProvider(
 
         if (index == -1)
         {
-            context = null;
+            model = null;
 
             return false;
         }
 
-        context = contexts[index];
+        model = contexts[index].Model;
 
         return true;
     }
