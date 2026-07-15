@@ -1,7 +1,7 @@
 namespace Macaron.InlineInterface;
 
 internal sealed record PropertyImplementationModel(
-    PropertyGenerationModel Property,
+    int PropertyIndex,
     string InterfaceType,
     bool HasGetter,
     bool HasSetter

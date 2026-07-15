@@ -49,15 +49,15 @@ internal static class InterfaceGenerationModelFactory
             eventSymbols,
             genericParameterMap
         );
-        var eventModels = eventContextProvider.Models.ToImmutableArray();
+        var eventModels = eventContextProvider.Models;
         var eventImplementationBuilder = ImmutableArray.CreateBuilder<EventImplementationModel>();
 
         foreach (var eventSymbol in eventSymbols)
         {
-            if (eventContextProvider.TryGetEventModel(eventSymbol, out var eventModel))
+            if (eventContextProvider.TryGetEventModelIndex(eventSymbol, out var eventModelIndex))
             {
                 eventImplementationBuilder.Add(new EventImplementationModel(
-                    eventModel,
+                    eventModelIndex,
                     interfaceTypeStringProvider.GetInterfaceTypeName(eventSymbol.ContainingType)
                 ));
             }
@@ -72,15 +72,15 @@ internal static class InterfaceGenerationModelFactory
             globalTypeBuilder,
             hasEventMembers
         );
-        var propertyModels = propertyContextProvider.Models.ToImmutableArray();
+        var propertyModels = propertyContextProvider.Models;
         var propertyImplementationBuilder = ImmutableArray.CreateBuilder<PropertyImplementationModel>();
 
         foreach (var propertySymbol in propertySymbols)
         {
-            if (propertyContextProvider.TryGetPropertyModel(propertySymbol, out var propertyModel))
+            if (propertyContextProvider.TryGetPropertyModelIndex(propertySymbol, out var propertyModelIndex))
             {
                 propertyImplementationBuilder.Add(new PropertyImplementationModel(
-                    propertyModel,
+                    propertyModelIndex,
                     interfaceTypeStringProvider.GetInterfaceTypeName(propertySymbol.ContainingType),
                     HasGetter: propertySymbol.GetMethod != null,
                     HasSetter: propertySymbol.SetMethod != null
@@ -96,15 +96,15 @@ internal static class InterfaceGenerationModelFactory
             globalTypeBuilder,
             hasEventMembers
         );
-        var methodModels = methodContextProvider.Models.ToImmutableArray();
+        var methodModels = methodContextProvider.Models;
         var methodImplementationBuilder = ImmutableArray.CreateBuilder<MethodImplementationModel>();
 
         foreach (var methodSymbol in methodSymbols)
         {
-            if (methodContextProvider.TryGetMethodModel(methodSymbol, out var methodModel))
+            if (methodContextProvider.TryGetMethodModelIndex(methodSymbol, out var methodModelIndex))
             {
                 methodImplementationBuilder.Add(new MethodImplementationModel(
-                    methodModel,
+                    methodModelIndex,
                     interfaceTypeStringProvider.GetInterfaceTypeName(methodSymbol.ContainingType)
                 ));
             }

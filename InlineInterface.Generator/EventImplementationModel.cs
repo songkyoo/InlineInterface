@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
 internal sealed record EventImplementationModel(
-    EventGenerationModel Event,
+    int EventIndex,
     string InterfaceType
 );

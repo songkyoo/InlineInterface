@@ -209,7 +209,7 @@ internal sealed class PropertyCodeGenerator(
 
     public ImmutableArray<string> GetInterfaceImplementation(PropertyImplementationModel implementation)
     {
-        var context = implementation.Property;
+        var context = properties[implementation.PropertyIndex];
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
         var propertyName = context.IsIndexer ? "this" : context.Name;

@@ -4,5 +4,6 @@ namespace Macaron.InlineInterface;
 
 internal sealed record EventContext(
     INamedTypeSymbol TypeSymbol,
-    EventGenerationModel Model
+    EventGenerationModel Model,
+    int ModelIndex = -1
 );

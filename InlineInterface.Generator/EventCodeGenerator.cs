@@ -43,7 +43,7 @@ internal sealed class EventCodeGenerator(
 
     public ImmutableArray<string> GetInterfaceImplementation(EventImplementationModel implementation)
     {
-        var model = implementation.Event;
+        var model = events[implementation.EventIndex];
         var implementationBuilder = ImmutableArray.CreateBuilder<string>();
 
         implementationBuilder.Add($"event {model.Type} {implementation.InterfaceType}.{model.Name}");

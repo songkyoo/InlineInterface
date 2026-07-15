@@ -6,5 +6,6 @@ namespace Macaron.InlineInterface;
 internal sealed record MethodContext(
     ITypeSymbol ReturnTypeSymbol,
     ImmutableArray<IParameterSymbol> ParameterTypeSymbols,
-    MethodGenerationModel Model
+    MethodGenerationModel Model,
+    int ModelIndex = -1
 );

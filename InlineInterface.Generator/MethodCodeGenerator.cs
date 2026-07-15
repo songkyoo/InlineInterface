@@ -74,7 +74,7 @@ internal sealed class MethodCodeGenerator(
 
     public string GetInterfaceImplementation(MethodImplementationModel implementation)
     {
-        var context = implementation.Method;
+        var context = methods[implementation.MethodIndex];
         var memberDescription = CreateMessageLiteral($"method '{implementation.InterfaceType}.{context.Name}({context.Parameters})'");
 
         return $"{context.ReturnType} {implementation.InterfaceType}.{context.Name}({context.Parameters}) => ({context.FieldName} ?? throw {containingBuilderType}.CreateMissingInvocationDelegateException({memberDescription}))({context.Arguments});";

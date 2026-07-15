@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InlineInterface.ParameterStringHelpers;
@@ -13,15 +12,22 @@ internal sealed class MethodContextProvider(
     bool hasEventMembers
 )
 {
+    #region Nested Types
+    private sealed record ProviderCache(
+        ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> Contexts,
+        ImmutableArray<MethodGenerationModel> Models
+    );
+    #endregion
+
     #region Static Methods
-    private static ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> CreateCache(
+    private static ProviderCache CreateCache(
         IEnumerable<IMethodSymbol> methodSymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string globalTypeBuilder,
         bool hasEventMembers
     )
     {
-        var builder = new Dictionary<string, List<MethodContext>>();
+        var builder = new SortedDictionary<string, List<MethodContext>>();
 
         foreach (var methodSymbol in methodSymbols)
         {
@@ -99,9 +105,26 @@ internal sealed class MethodContextProvider(
             contexts.Add(newContext);
         }
 
-        return builder.ToImmutableSortedDictionary(
-            keySelector: x => x.Key,
-            elementSelector: x => x.Value.ToImmutableArray()
+        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<MethodContext>>();
+        var modelBuilder = ImmutableArray.CreateBuilder<MethodGenerationModel>();
+
+        foreach (var pair in builder)
+        {
+            var contexts = pair.Value;
+            var contextBuilder = ImmutableArray.CreateBuilder<MethodContext>(contexts.Count);
+
+            foreach (var context in contexts)
+            {
+                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                modelBuilder.Add(context.Model);
+            }
+
+            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        }
+
+        return new ProviderCache(
+            Contexts: contextCacheBuilder.ToImmutable(),
+            Models: modelBuilder.ToImmutable()
         );
     }
 
@@ -149,7 +172,7 @@ internal sealed class MethodContextProvider(
     #endregion
 
     #region Fields
-    private readonly ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> _cache = CreateCache(
+    private readonly ProviderCache _cache = CreateCache(
         methodSymbols,
         genericParameterMap,
         globalTypeBuilder,
@@ -158,20 +181,18 @@ internal sealed class MethodContextProvider(
     #endregion
 
     #region Properties
-    public IEnumerable<MethodGenerationModel> Models => _cache.Values
-        .SelectMany(static contexts => contexts)
-        .Select(static context => context.Model);
+    public ImmutableArray<MethodGenerationModel> Models => _cache.Models;
     #endregion
 
     #region Methods
-    public bool TryGetMethodModel(
+    public bool TryGetMethodModelIndex(
         IMethodSymbol methodSymbol,
-        [NotNullWhen(returnValue: true)]out MethodGenerationModel? model
+        out int modelIndex
     )
     {
-        if (!_cache.TryGetValue(methodSymbol.Name, out var contexts))
+        if (!_cache.Contexts.TryGetValue(methodSymbol.Name, out var contexts))
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
@@ -190,12 +211,12 @@ internal sealed class MethodContextProvider(
 
         if (index == -1)
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
 
-        model = contexts[index].Model;
+        modelIndex = contexts[index].ModelIndex;
 
         return true;
     }

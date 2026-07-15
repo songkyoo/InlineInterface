@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InlineInterface.ParameterStringHelpers;
@@ -13,15 +12,22 @@ internal sealed class PropertyContextProvider(
     bool hasEventMembers
 )
 {
+    #region Nested Types
+    private sealed record ProviderCache(
+        ImmutableSortedDictionary<string, ImmutableArray<PropertyContext>> Contexts,
+        ImmutableArray<PropertyGenerationModel> Models
+    );
+    #endregion
+
     #region Static Methods
-    private static ImmutableSortedDictionary<string, ImmutableArray<PropertyContext>> CreateCache(
+    private static ProviderCache CreateCache(
         IEnumerable<IPropertySymbol> propertySymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string globalTypeBuilder,
         bool hasEventMembers
     )
     {
-        var builder = new Dictionary<string, List<PropertyContext>>();
+        var builder = new SortedDictionary<string, List<PropertyContext>>();
 
         foreach (var propertySymbol in propertySymbols)
         {
@@ -91,9 +97,26 @@ internal sealed class PropertyContextProvider(
             }
         }
 
-        return builder.ToImmutableSortedDictionary(
-            keySelector: x => x.Key,
-            elementSelector: x => x.Value.ToImmutableArray()
+        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<PropertyContext>>();
+        var modelBuilder = ImmutableArray.CreateBuilder<PropertyGenerationModel>();
+
+        foreach (var pair in builder)
+        {
+            var contexts = pair.Value;
+            var contextBuilder = ImmutableArray.CreateBuilder<PropertyContext>(contexts.Count);
+
+            foreach (var context in contexts)
+            {
+                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                modelBuilder.Add(context.Model);
+            }
+
+            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        }
+
+        return new ProviderCache(
+            Contexts: contextCacheBuilder.ToImmutable(),
+            Models: modelBuilder.ToImmutable()
         );
     }
 
@@ -253,7 +276,7 @@ internal sealed class PropertyContextProvider(
     #endregion
 
     #region Fields
-    private readonly ImmutableSortedDictionary<string, ImmutableArray<PropertyContext>> _cache = CreateCache(
+    private readonly ProviderCache _cache = CreateCache(
         propertySymbols,
         genericParameterMap,
         globalTypeBuilder,
@@ -262,20 +285,18 @@ internal sealed class PropertyContextProvider(
     #endregion
 
     #region Properties
-    public IEnumerable<PropertyGenerationModel> Models => _cache.Values
-        .SelectMany(static contexts => contexts)
-        .Select(static context => context.Model);
+    public ImmutableArray<PropertyGenerationModel> Models => _cache.Models;
     #endregion
 
     #region Methods
-    public bool TryGetPropertyModel(
+    public bool TryGetPropertyModelIndex(
         IPropertySymbol propertySymbol,
-        [NotNullWhen(returnValue: true)] out PropertyGenerationModel? model
+        out int modelIndex
     )
     {
-        if (!_cache.TryGetValue(propertySymbol.Name, out var contexts))
+        if (!_cache.Contexts.TryGetValue(propertySymbol.Name, out var contexts))
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
@@ -299,12 +320,12 @@ internal sealed class PropertyContextProvider(
 
         if (index == -1)
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
 
-        model = contexts[index].Model;
+        modelIndex = contexts[index].ModelIndex;
 
         return true;
     }

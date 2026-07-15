@@ -6,5 +6,6 @@ namespace Macaron.InlineInterface;
 internal sealed record PropertyContext(
     ITypeSymbol TypeSymbol,
     ImmutableArray<IParameterSymbol> ParameterSymbols,
-    PropertyGenerationModel Model
+    PropertyGenerationModel Model,
+    int ModelIndex = -1
 );

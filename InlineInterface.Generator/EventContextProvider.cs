@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InlineInterface.ParameterStringHelpers;
@@ -11,13 +10,20 @@ internal sealed class EventContextProvider(
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
 )
 {
+    #region Nested Types
+    private sealed record ProviderCache(
+        ImmutableSortedDictionary<string, ImmutableArray<EventContext>> Contexts,
+        ImmutableArray<EventGenerationModel> Models
+    );
+    #endregion
+
     #region Static Methods
-    private static ImmutableSortedDictionary<string, ImmutableArray<EventContext>> CreateCache(
+    private static ProviderCache CreateCache(
         IEnumerable<IEventSymbol> eventSymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
     {
-        var builder = new Dictionary<string, List<EventContext>>();
+        var builder = new SortedDictionary<string, List<EventContext>>();
 
         foreach (var eventSymbol in eventSymbols)
         {
@@ -66,9 +72,26 @@ internal sealed class EventContextProvider(
             contexts.Add(newContext);
         }
 
-        return builder.ToImmutableSortedDictionary(
-            keySelector: x => x.Key,
-            elementSelector: x => x.Value.ToImmutableArray()
+        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<EventContext>>();
+        var modelBuilder = ImmutableArray.CreateBuilder<EventGenerationModel>();
+
+        foreach (var pair in builder)
+        {
+            var contexts = pair.Value;
+            var contextBuilder = ImmutableArray.CreateBuilder<EventContext>(contexts.Count);
+
+            foreach (var context in contexts)
+            {
+                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                modelBuilder.Add(context.Model);
+            }
+
+            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        }
+
+        return new ProviderCache(
+            Contexts: contextCacheBuilder.ToImmutable(),
+            Models: modelBuilder.ToImmutable()
         );
     }
 
@@ -120,28 +143,25 @@ internal sealed class EventContextProvider(
     #endregion
 
     #region Fields
-    private readonly ImmutableSortedDictionary<string, ImmutableArray<EventContext>> _cache = CreateCache(
+    private readonly ProviderCache _cache = CreateCache(
         eventSymbols,
         genericParameterMap
     );
     #endregion
 
     #region Properties
-    public IEnumerable<EventGenerationModel> Models => _cache
-        .Values
-        .SelectMany(static contexts => contexts)
-        .Select(static context => context.Model);
+    public ImmutableArray<EventGenerationModel> Models => _cache.Models;
     #endregion
 
     #region Methods
-    public bool TryGetEventModel(
+    public bool TryGetEventModelIndex(
         IEventSymbol eventSymbol,
-        [NotNullWhen(returnValue: true)]out EventGenerationModel? model
+        out int modelIndex
     )
     {
-        if (!_cache.TryGetValue(eventSymbol.Name, out var contexts))
+        if (!_cache.Contexts.TryGetValue(eventSymbol.Name, out var contexts))
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
@@ -160,12 +180,12 @@ internal sealed class EventContextProvider(
 
         if (index == -1)
         {
-            model = null;
+            modelIndex = -1;
 
             return false;
         }
 
-        model = contexts[index].Model;
+        modelIndex = contexts[index].ModelIndex;
 
         return true;
     }
