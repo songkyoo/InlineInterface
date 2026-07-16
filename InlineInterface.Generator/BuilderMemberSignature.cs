@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal readonly struct BuilderMemberSignature
+public readonly struct BuilderMemberSignature
 {
     public BuilderMemberSignature(
         string apiName,
@@ -37,7 +37,7 @@ internal readonly struct BuilderMemberSignature
     public BuilderDelegateSignature SecondDelegate { get; }
 }
 
-internal readonly struct BuilderDelegateSignature
+public readonly struct BuilderDelegateSignature
 {
     public BuilderDelegateSignature(
         ITypeSymbol? returnType,
@@ -78,7 +78,7 @@ internal readonly struct BuilderDelegateSignature
     }
 }
 
-internal static class BuilderMemberSignatureFactory
+public static class BuilderMemberSignatureFactory
 {
     public static BuilderMemberSignature Create(MethodSignature methodSignature)
     {
@@ -227,7 +227,7 @@ internal static class BuilderMemberSignatureFactory
     }
 }
 
-internal sealed class BuilderMemberSignatureComparer : IEqualityComparer<BuilderMemberSignature>
+public sealed class BuilderMemberSignatureComparer : IEqualityComparer<BuilderMemberSignature>
 {
     public static BuilderMemberSignatureComparer Instance { get; } = new();
 

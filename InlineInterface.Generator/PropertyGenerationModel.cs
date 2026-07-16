@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed record PropertyGenerationModel(
+public sealed record PropertyGenerationModel(
     bool IsIndexer,
     string Type,
     string Name,

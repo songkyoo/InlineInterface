@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Macaron.InlineInterface;
 
-internal sealed record InterfaceGenerationModel(
+public sealed record InterfaceGenerationModel(
     string Type,
     string GenericParameters,
     ImmutableArray<string> GenericParameterConstraints,

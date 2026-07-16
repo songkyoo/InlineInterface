@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal static class InlineInterfaceDiagnostics
+public static class InlineInterfaceDiagnostics
 {
     public static readonly DiagnosticDescriptor TargetTypeMustBeInterfaceRule = new(
         id: "MII0001",

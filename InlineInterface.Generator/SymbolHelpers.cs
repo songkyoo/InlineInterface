@@ -7,7 +7,7 @@ using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.InlineInterface;
 
-internal static class SymbolHelpers
+public static class SymbolHelpers
 {
     public static ImmutableArray<INamedTypeSymbol> GetNestedTypeSymbols(INamedTypeSymbol typeSymbol)
     {

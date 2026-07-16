@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
 
-internal static class InlineInterfaceDiagnosticFactory
+public static class InlineInterfaceDiagnosticFactory
 {
     public static Diagnostic TargetTypeMustBeInterface(TypeSyntax typeSyntax)
     {

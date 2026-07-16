@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Macaron.InlineInterface;
 
-internal static class SourceGenerationHelpers
+public static class SourceGenerationHelpers
 {
     const string Indent = "    ";
 

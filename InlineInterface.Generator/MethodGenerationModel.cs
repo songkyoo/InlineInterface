@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed record MethodGenerationModel(
+public sealed record MethodGenerationModel(
     string ReturnType,
     string Parameters,
     string Arguments,

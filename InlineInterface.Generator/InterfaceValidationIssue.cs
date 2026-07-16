@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
 
-internal readonly record struct InterfaceValidationIssue(
+public readonly record struct InterfaceValidationIssue(
     InterfaceValidationIssueKind Kind,
     string MemberName,
     SymbolKind MemberKind = default
@@ -26,7 +26,7 @@ internal readonly record struct InterfaceValidationIssue(
     }
 }
 
-internal enum InterfaceValidationIssueKind
+public enum InterfaceValidationIssueKind
 {
     NotAllowedEventModifier,
     NotAllowedGenericMethod,

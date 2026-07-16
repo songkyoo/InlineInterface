@@ -7,11 +7,14 @@ using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class RequiredBuilderMemberProvider
+public sealed class RequiredBuilderMemberProvider
 {
-    private readonly ConcurrentDictionary<INamedTypeSymbol, RequiredBuilderMembersResult> _cache = new(
+    private const int CacheLockCancellationPollingMilliseconds = 10;
+
+    private readonly ConcurrentDictionary<INamedTypeSymbol, CacheEntry> _cache = new(
         SymbolEqualityComparer.Default
     );
+    private ConcurrentDictionary<ISymbol, string>? _descriptionCache;
 
     public bool TryGetRequiredMembers(
         INamedTypeSymbol interfaceSymbol,
@@ -21,19 +24,99 @@ internal sealed class RequiredBuilderMemberProvider
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!_cache.TryGetValue(interfaceSymbol, out var result))
-        {
-            var created = CreateResult(interfaceSymbol, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            result = _cache.GetOrAdd(interfaceSymbol, created);
-        }
+        var entry = _cache.GetOrAdd(
+            interfaceSymbol,
+            static symbol => new CacheEntry(symbol)
+        );
+        var result = entry.GetResult(cancellationToken);
 
         members = result.Members;
 
         return result.IsValid;
     }
 
-    private static RequiredBuilderMembersResult CreateResult(
+    public string GetDescription(
+        RequiredBuilderMember member,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cache = Volatile.Read(ref _descriptionCache);
+
+        if (cache is null)
+        {
+            var created = new ConcurrentDictionary<ISymbol, string>(SymbolEqualityComparer.Default);
+            cache = Interlocked.CompareExchange(ref _descriptionCache, created, null) ?? created;
+        }
+
+        if (cache.TryGetValue(member.Symbol, out var description))
+        {
+            return description;
+        }
+
+        var createdDescription = member.CreateDescription(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return cache.GetOrAdd(member.Symbol, createdDescription);
+    }
+
+    private sealed class CacheEntry(INamedTypeSymbol interfaceSymbol)
+    {
+        private readonly object _gate = new();
+        private RequiredBuilderMembersResult _result;
+        private bool _isInitialized;
+
+        public RequiredBuilderMembersResult GetResult(CancellationToken cancellationToken)
+        {
+            if (Volatile.Read(ref _isInitialized))
+            {
+                return _result;
+            }
+
+            var lockTaken = false;
+
+            try
+            {
+                while (!lockTaken)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Monitor.TryEnter(
+                        _gate,
+                        CacheLockCancellationPollingMilliseconds,
+                        ref lockTaken
+                    );
+                }
+
+                if (_isInitialized)
+                {
+                    return _result;
+                }
+
+                var result = RequiredBuilderMemberFactory.Create(
+                    interfaceSymbol,
+                    cancellationToken
+                );
+                cancellationToken.ThrowIfCancellationRequested();
+                _result = result;
+                Volatile.Write(ref _isInitialized, true);
+
+                return result;
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    Monitor.Exit(_gate);
+                }
+            }
+        }
+    }
+}
+
+public static class RequiredBuilderMemberFactory
+{
+    public static RequiredBuilderMembersResult Create(
         INamedTypeSymbol interfaceSymbol,
         CancellationToken cancellationToken
     )
@@ -134,11 +217,6 @@ internal sealed class RequiredBuilderMemberProvider
         return builder.ToImmutable();
     }
 
-    private readonly record struct RequiredBuilderMembersResult(
-        bool IsValid,
-        ImmutableArray<RequiredBuilderMember> Members
-    );
-
     private readonly record struct PropertyRequirement(
         IPropertySymbol Symbol,
         bool RequiresGetter,
@@ -146,7 +224,12 @@ internal sealed class RequiredBuilderMemberProvider
     );
 }
 
-internal readonly record struct RequiredBuilderMember(
+public readonly record struct RequiredBuilderMembersResult(
+    bool IsValid,
+    ImmutableArray<RequiredBuilderMember> Members
+);
+
+public readonly record struct RequiredBuilderMember(
     BuilderMemberSignature Signature,
     ISymbol Symbol,
     RequiredBuilderMemberKind Kind
@@ -192,7 +275,7 @@ internal readonly record struct RequiredBuilderMember(
     }
 }
 
-internal enum RequiredBuilderMemberKind
+public enum RequiredBuilderMemberKind
 {
     Method,
     Property,

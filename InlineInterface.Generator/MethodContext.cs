@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed class MethodContext(MethodSignature signature, MethodGenerationModel model)
+public sealed class MethodContext(MethodSignature signature, MethodGenerationModel model)
 {
     public MethodSignature Signature { get; } = signature;
 

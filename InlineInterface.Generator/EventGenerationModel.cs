@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed record EventGenerationModel(
+public sealed record EventGenerationModel(
     string Type,
     string Name,
     string UniqueName,

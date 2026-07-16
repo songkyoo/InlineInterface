@@ -8,6 +8,9 @@ namespace Macaron.InlineInterface;
 [Generator]
 public sealed class InlineInterfaceGenerator : IIncrementalGenerator
 {
+    internal const string CollectedTargetsTrackingName = "CollectedTargets";
+    internal const string ValidationTrackingName = "TargetInterfaceValidation";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // 대상 호출 판별
@@ -31,10 +34,13 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             }
         );
 
-        var validatedProvider = typeSymbolProvider
+        var collectedTargetsProvider = typeSymbolProvider
             .Where(static result => result is TargetTypeDiscoveryResult.Success)
             .Select(static (result, _) => (TargetTypeDiscoveryResult.Success)result)
             .Collect()
+            .WithTrackingName(CollectedTargetsTrackingName);
+
+        var validatedProvider = collectedTargetsProvider
             .SelectMany(static (results, cancellationToken) =>
             {
                 var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
@@ -57,7 +63,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 }
 
                 return builder;
-            });
+            })
+            .WithTrackingName(ValidationTrackingName);
 
         context.RegisterSourceOutput(
             source: validatedProvider

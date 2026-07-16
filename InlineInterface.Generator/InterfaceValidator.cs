@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
 
-internal static class InterfaceValidator
+public static class InterfaceValidator
 {
     public static TargetInterfaceValidationResult ValidateTargetInterface(
         INamedTypeSymbol interfaceSymbol,

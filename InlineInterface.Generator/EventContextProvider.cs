@@ -5,7 +5,7 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class EventContextProvider(
+public sealed class EventContextProvider(
     ImmutableArray<IEventSymbol> eventSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
 )

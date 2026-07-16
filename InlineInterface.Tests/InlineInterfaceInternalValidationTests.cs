@@ -301,6 +301,39 @@ public partial class InlineInterfaceGeneratorTests
     }
 
     [Test]
+    public void RequiredBuilderMemberProviderCachesDescriptionsAfterFirstMissingDiagnostic()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+            """
+        );
+        var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
+        var provider = new RequiredBuilderMemberProvider();
+
+        Assert.That(provider.TryGetRequiredMembers(
+            interfaceSymbol,
+            CancellationToken.None,
+            out var requiredMembers
+        ), Is.True);
+
+        var first = provider.GetDescription(requiredMembers[0], CancellationToken.None);
+        var second = provider.GetDescription(requiredMembers[0], CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.EqualTo("method 'Write(string value)'"));
+            Assert.That(second, Is.SameAs(first));
+        });
+    }
+
+    [Test]
     public void MethodSignatureComparerUsesReturnAndParameterTypes()
     {
         var compilation = CreateCompilation(

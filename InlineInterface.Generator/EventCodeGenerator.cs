@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class EventCodeGenerator(
+public sealed class EventCodeGenerator(
     ImmutableArray<EventGenerationModel> events,
     ImmutableArray<string> interfaceTypes,
     string indent

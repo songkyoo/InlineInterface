@@ -5,7 +5,7 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class PropertyContextProvider(
+public sealed class PropertyContextProvider(
     ImmutableArray<IPropertySymbol> propertySymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,

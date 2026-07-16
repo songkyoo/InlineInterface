@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class PropertyCodeGenerator(
+public sealed class PropertyCodeGenerator(
     ImmutableArray<PropertyGenerationModel> properties,
     ImmutableArray<string> interfaceTypes,
     string containingBuilderType,

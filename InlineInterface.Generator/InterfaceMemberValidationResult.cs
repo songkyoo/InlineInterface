@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal readonly struct InterfaceMemberValidationResult
+public readonly struct InterfaceMemberValidationResult
 {
     private readonly int _index;
     private readonly InterfaceContext? _context;

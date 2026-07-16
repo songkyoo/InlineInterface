@@ -92,6 +92,11 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (requiredMembers.IsEmpty)
+        {
+            return;
+        }
+
         var configuredMemberSignatures = new HashSet<BuilderMemberSignature>(
             BuilderMemberSignatureComparer.Instance
         );
@@ -121,7 +126,10 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             }
 
             missingMembersBuilder ??= ImmutableArray.CreateBuilder<string>();
-            missingMembersBuilder.Add(member.CreateDescription(context.CancellationToken));
+            missingMembersBuilder.Add(requiredMemberProvider.GetDescription(
+                member,
+                context.CancellationToken
+            ));
         }
 
         if (missingMembersBuilder is null)

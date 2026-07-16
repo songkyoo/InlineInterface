@@ -6,7 +6,7 @@ using static Microsoft.CodeAnalysis.Accessibility;
 
 namespace Macaron.InlineInterface;
 
-internal static class TargetTypeExtractor
+public static class TargetTypeExtractor
 {
     public static bool IsCandidate(SyntaxNode syntaxNode)
     {

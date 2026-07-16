@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class InterfaceTypeProvider(
+public sealed class InterfaceTypeProvider(
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     int capacity
 )

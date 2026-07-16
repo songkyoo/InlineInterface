@@ -7,7 +7,7 @@ using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Macaron.InlineInterface;
 
-internal static class InterfaceGenerationModelFactory
+public static class InterfaceGenerationModelFactory
 {
     #region Static Methods
     public static InterfaceGenerationModel Create(

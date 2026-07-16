@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class EventContext(
+public sealed class EventContext(
     INamedTypeSymbol typeSymbol,
     EventGenerationModel model
 )

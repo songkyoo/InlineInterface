@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
 
-internal abstract record TargetTypeDiscoveryResult
+public abstract record TargetTypeDiscoveryResult
 {
     private TargetTypeDiscoveryResult() { }
 

@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal static class ParameterStringHelpers
+public static class ParameterStringHelpers
 {
     public static (string Type, string Name) GetParameterString(
         IParameterSymbol parameterSymbol,

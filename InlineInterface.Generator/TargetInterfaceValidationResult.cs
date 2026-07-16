@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal abstract record TargetInterfaceValidationResult
+public abstract record TargetInterfaceValidationResult
 {
     public sealed record Success(
         INamedTypeSymbol InterfaceSymbol,

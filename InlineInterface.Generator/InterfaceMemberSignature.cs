@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal readonly record struct MethodSignature(
+public readonly record struct MethodSignature(
     string Name,
     ITypeSymbol ReturnType,
     ImmutableArray<IParameterSymbol> Parameters
@@ -19,7 +19,7 @@ internal readonly record struct MethodSignature(
     }
 }
 
-internal readonly record struct PropertySignature(
+public readonly record struct PropertySignature(
     string Name,
     ITypeSymbol Type,
     ImmutableArray<IParameterSymbol> Parameters
@@ -35,7 +35,7 @@ internal readonly record struct PropertySignature(
     }
 }
 
-internal sealed class MethodSignatureComparer : IEqualityComparer<MethodSignature>
+public sealed class MethodSignatureComparer : IEqualityComparer<MethodSignature>
 {
     public static MethodSignatureComparer Instance { get; } = new();
 
@@ -55,7 +55,7 @@ internal sealed class MethodSignatureComparer : IEqualityComparer<MethodSignatur
     }
 }
 
-internal sealed class PropertySignatureComparer : IEqualityComparer<PropertySignature>
+public sealed class PropertySignatureComparer : IEqualityComparer<PropertySignature>
 {
     public static PropertySignatureComparer Instance { get; } = new();
 
@@ -75,7 +75,7 @@ internal sealed class PropertySignatureComparer : IEqualityComparer<PropertySign
     }
 }
 
-internal static class InterfaceMemberSignatureHelpers
+public static class InterfaceMemberSignatureHelpers
 {
     public static bool ParametersEqual(
         ImmutableArray<IParameterSymbol> left,

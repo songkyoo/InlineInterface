@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class MethodCodeGenerator(
+public sealed class MethodCodeGenerator(
     ImmutableArray<MethodGenerationModel> methods,
     ImmutableArray<string> interfaceTypes,
     string containingBuilderType,

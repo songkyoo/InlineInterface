@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed class PropertyContext(PropertySignature signature, PropertyGenerationModel model)
+public sealed class PropertyContext(PropertySignature signature, PropertyGenerationModel model)
 {
     public PropertySignature Signature { get; } = signature;
 

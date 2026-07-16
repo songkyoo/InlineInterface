@@ -1,6 +1,6 @@
 namespace Macaron.InlineInterface;
 
-internal sealed record MethodImplementationModel(
+public sealed record MethodImplementationModel(
     int MethodIndex,
     int InterfaceTypeIndex
 );

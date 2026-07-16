@@ -5,7 +5,7 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class MethodContextProvider(
+public sealed class MethodContextProvider(
     ImmutableArray<IMethodSymbol> methodSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,
