@@ -14,8 +14,8 @@ internal sealed class PropertyContextProvider(
 {
     #region Nested Types
     private sealed record ProviderCache(
-        ImmutableSortedDictionary<string, ImmutableArray<PropertyContext>> Contexts,
-        ImmutableArray<PropertyGenerationModel> Models
+        ImmutableArray<PropertyGenerationModel> Models,
+        ImmutableArray<int> GenerationModelIndicesByImplementation
     );
     #endregion
 
@@ -28,6 +28,7 @@ internal sealed class PropertyContextProvider(
     )
     {
         var builder = new SortedDictionary<string, List<PropertyContext>>();
+        var implementationContexts = new List<PropertyContext>();
 
         foreach (var propertySymbol in propertySymbols)
         {
@@ -56,19 +57,23 @@ internal sealed class PropertyContextProvider(
                 }
             }
 
+            PropertyContext context;
+
             if (index == -1)
             {
-                contexts.Add(CreateContext(
+                context = CreateContext(
                     propertySymbol,
                     genericParameterMap,
                     globalTypeBuilder,
                     hasEventMembers,
                     contexts.Count
-                ));
+                );
+
+                contexts.Add(context);
             }
             else
             {
-                var existing = contexts[index];
+                context = contexts[index];
                 var created = CreateContext(
                     propertySymbol,
                     genericParameterMap,
@@ -77,46 +82,46 @@ internal sealed class PropertyContextProvider(
                     index
                 );
 
-                var existingModel = existing.Model;
+                var existingModel = context.Model;
                 var createdModel = created.Model;
 
-                contexts[index] = existing with
+                context.Model = existingModel with
                 {
-                    Model = existingModel with
-                    {
-                        GetterDelegateType = existingModel.GetterDelegateType ?? createdModel.GetterDelegateType,
-                        SetterDelegateType = existingModel.SetterDelegateType ?? createdModel.SetterDelegateType,
-                        GetterName = existingModel.GetterName ?? createdModel.GetterName,
-                        SetterName = existingModel.SetterName ?? createdModel.SetterName,
-                        GetterParameterName = existingModel.GetterParameterName ?? createdModel.GetterParameterName,
-                        SetterParameterName = existingModel.SetterParameterName ?? createdModel.SetterParameterName,
-                        GetterFieldName = existingModel.GetterFieldName ?? createdModel.GetterFieldName,
-                        SetterFieldName = existingModel.SetterFieldName ?? createdModel.SetterFieldName,
-                    },
+                    GetterDelegateType = existingModel.GetterDelegateType ?? createdModel.GetterDelegateType,
+                    SetterDelegateType = existingModel.SetterDelegateType ?? createdModel.SetterDelegateType,
+                    GetterName = existingModel.GetterName ?? createdModel.GetterName,
+                    SetterName = existingModel.SetterName ?? createdModel.SetterName,
+                    GetterParameterName = existingModel.GetterParameterName ?? createdModel.GetterParameterName,
+                    SetterParameterName = existingModel.SetterParameterName ?? createdModel.SetterParameterName,
+                    GetterFieldName = existingModel.GetterFieldName ?? createdModel.GetterFieldName,
+                    SetterFieldName = existingModel.SetterFieldName ?? createdModel.SetterFieldName,
                 };
             }
+
+            implementationContexts.Add(context);
         }
 
-        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<PropertyContext>>();
         var modelBuilder = ImmutableArray.CreateBuilder<PropertyGenerationModel>();
 
         foreach (var pair in builder)
         {
-            var contexts = pair.Value;
-            var contextBuilder = ImmutableArray.CreateBuilder<PropertyContext>(contexts.Count);
-
-            foreach (var context in contexts)
+            foreach (var context in pair.Value)
             {
-                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                context.ModelIndex = modelBuilder.Count;
                 modelBuilder.Add(context.Model);
             }
+        }
 
-            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+
+        foreach (var context in implementationContexts)
+        {
+            indexBuilder.Add(context.ModelIndex);
         }
 
         return new ProviderCache(
-            Contexts: contextCacheBuilder.ToImmutable(),
-            Models: modelBuilder.ToImmutable()
+            Models: modelBuilder.ToImmutable(),
+            GenerationModelIndicesByImplementation: indexBuilder.ToImmutable()
         );
     }
 
@@ -252,9 +257,9 @@ internal sealed class PropertyContextProvider(
         }
 
         return new PropertyContext(
-            TypeSymbol: propertySymbol.Type,
-            ParameterSymbols: propertySymbol.Parameters,
-            Model: new PropertyGenerationModel(
+            propertySymbol.Type,
+            propertySymbol.Parameters,
+            new PropertyGenerationModel(
                 IsIndexer: isIndexer,
                 Type: propertyType,
                 Name: propertySymbol.Name,
@@ -286,48 +291,7 @@ internal sealed class PropertyContextProvider(
 
     #region Properties
     public ImmutableArray<PropertyGenerationModel> Models => _cache.Models;
-    #endregion
-
-    #region Methods
-    public bool TryGetPropertyModelIndex(
-        IPropertySymbol propertySymbol,
-        out int modelIndex
-    )
-    {
-        if (!_cache.Contexts.TryGetValue(propertySymbol.Name, out var contexts))
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        var index = -1;
-
-        for (var i = 0; i < contexts.Length; i++)
-        {
-            if (MatchesPropertySignature(
-                propertySymbol,
-                contexts[i].Model.Name,
-                contexts[i].TypeSymbol,
-                contexts[i].ParameterSymbols
-            ))
-            {
-                index = i;
-
-                break;
-            }
-        }
-
-        if (index == -1)
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        modelIndex = contexts[index].ModelIndex;
-
-        return true;
-    }
+    public ImmutableArray<int> GenerationModelIndicesByImplementation =>
+        _cache.GenerationModelIndicesByImplementation;
     #endregion
 }

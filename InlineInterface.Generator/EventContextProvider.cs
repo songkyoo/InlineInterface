@@ -12,8 +12,8 @@ internal sealed class EventContextProvider(
 {
     #region Nested Types
     private sealed record ProviderCache(
-        ImmutableSortedDictionary<string, ImmutableArray<EventContext>> Contexts,
-        ImmutableArray<EventGenerationModel> Models
+        ImmutableArray<EventGenerationModel> Models,
+        ImmutableArray<int> GenerationModelIndicesByImplementation
     );
     #endregion
 
@@ -24,6 +24,7 @@ internal sealed class EventContextProvider(
     )
     {
         var builder = new SortedDictionary<string, List<EventContext>>();
+        var implementationContexts = new List<EventContext?>();
 
         foreach (var eventSymbol in eventSymbols)
         {
@@ -37,61 +38,78 @@ internal sealed class EventContextProvider(
 
             if (eventSymbol.Type is not INamedTypeSymbol typeSymbol)
             {
+                implementationContexts.Add(null);
+
                 continue;
             }
 
             if (typeSymbol.TypeKind != TypeKind.Delegate || typeSymbol.DelegateInvokeMethod is null)
             {
+                implementationContexts.Add(null);
+
                 continue;
             }
 
-            if (contexts.Any(x => SymbolEqualityComparer.Default.Equals(typeSymbol, x.TypeSymbol)))
+            EventContext? context = null;
+
+            foreach (var existingContext in contexts)
             {
-                continue;
+                if (SymbolEqualityComparer.Default.Equals(typeSymbol, existingContext.TypeSymbol))
+                {
+                    context = existingContext;
+
+                    break;
+                }
             }
 
-            var type = SymbolHelpers.GetTypeString(typeSymbol, genericParameterMap);
-
-            if (!type.EndsWith("?"))
+            if (context is null)
             {
-                type += "?";
-            }
+                var type = SymbolHelpers.GetTypeString(typeSymbol, genericParameterMap);
 
-            var uniqueName = $"{eventName}_{contexts.Count}";
-            var newContext = new EventContext(
-                TypeSymbol: typeSymbol,
-                Model: CreateGenerationModel(
+                if (!type.EndsWith("?"))
+                {
+                    type += "?";
+                }
+
+                var uniqueName = $"{eventName}_{contexts.Count}";
+                context = new EventContext(
                     typeSymbol,
-                    type,
-                    eventName,
-                    uniqueName,
-                    genericParameterMap
-                )
-            );
+                    CreateGenerationModel(
+                        typeSymbol,
+                        type,
+                        eventName,
+                        uniqueName,
+                        genericParameterMap
+                    )
+                );
 
-            contexts.Add(newContext);
+                contexts.Add(context);
+            }
+
+            implementationContexts.Add(context);
         }
 
-        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<EventContext>>();
         var modelBuilder = ImmutableArray.CreateBuilder<EventGenerationModel>();
 
         foreach (var pair in builder)
         {
-            var contexts = pair.Value;
-            var contextBuilder = ImmutableArray.CreateBuilder<EventContext>(contexts.Count);
-
-            foreach (var context in contexts)
+            foreach (var context in pair.Value)
             {
-                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                context.ModelIndex = modelBuilder.Count;
                 modelBuilder.Add(context.Model);
             }
+        }
 
-            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+
+        foreach (var context in implementationContexts)
+        {
+            indexBuilder.Add(context?.ModelIndex ?? -1);
         }
 
         return new ProviderCache(
-            Contexts: contextCacheBuilder.ToImmutable(),
-            Models: modelBuilder.ToImmutable()
+            Models: modelBuilder.ToImmutable(),
+            GenerationModelIndicesByImplementation: indexBuilder.ToImmutable()
         );
     }
 
@@ -151,43 +169,7 @@ internal sealed class EventContextProvider(
 
     #region Properties
     public ImmutableArray<EventGenerationModel> Models => _cache.Models;
-    #endregion
-
-    #region Methods
-    public bool TryGetEventModelIndex(
-        IEventSymbol eventSymbol,
-        out int modelIndex
-    )
-    {
-        if (!_cache.Contexts.TryGetValue(eventSymbol.Name, out var contexts))
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        var index = -1;
-
-        for (var i = 0; i < contexts.Length; i++)
-        {
-            if (SymbolEqualityComparer.Default.Equals(contexts[i].TypeSymbol, eventSymbol.Type))
-            {
-                index = i;
-
-                break;
-            }
-        }
-
-        if (index == -1)
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        modelIndex = contexts[index].ModelIndex;
-
-        return true;
-    }
+    public ImmutableArray<int> GenerationModelIndicesByImplementation =>
+        _cache.GenerationModelIndicesByImplementation;
     #endregion
 }

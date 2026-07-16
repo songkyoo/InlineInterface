@@ -48,12 +48,18 @@ internal static class InterfaceGenerationModelFactory
             genericParameterMap
         );
         var eventModels = eventContextProvider.Models;
+        var eventGenerationModelIndicesByImplementation =
+            eventContextProvider.GenerationModelIndicesByImplementation;
         var eventImplementationBuilder = ImmutableArray.CreateBuilder<EventImplementationModel>();
 
-        foreach (var eventSymbol in eventSymbols)
+        for (var i = 0; i < eventSymbols.Length; i++)
         {
-            if (eventContextProvider.TryGetEventModelIndex(eventSymbol, out var eventModelIndex))
+            var eventModelIndex = eventGenerationModelIndicesByImplementation[i];
+
+            if (eventModelIndex >= 0)
             {
+                var eventSymbol = eventSymbols[i];
+
                 eventImplementationBuilder.Add(new EventImplementationModel(
                     eventModelIndex,
                     interfaceTypeProvider.GetIndex(eventSymbol.ContainingType)
@@ -71,19 +77,20 @@ internal static class InterfaceGenerationModelFactory
             hasEventMembers
         );
         var propertyModels = propertyContextProvider.Models;
+        var propertyGenerationModelIndicesByImplementation =
+            propertyContextProvider.GenerationModelIndicesByImplementation;
         var propertyImplementationBuilder = ImmutableArray.CreateBuilder<PropertyImplementationModel>();
 
-        foreach (var propertySymbol in propertySymbols)
+        for (var i = 0; i < propertySymbols.Length; i++)
         {
-            if (propertyContextProvider.TryGetPropertyModelIndex(propertySymbol, out var propertyModelIndex))
-            {
-                propertyImplementationBuilder.Add(new PropertyImplementationModel(
-                    propertyModelIndex,
-                    interfaceTypeProvider.GetIndex(propertySymbol.ContainingType),
-                    HasGetter: propertySymbol.GetMethod != null,
-                    HasSetter: propertySymbol.SetMethod != null
-                ));
-            }
+            var propertySymbol = propertySymbols[i];
+
+            propertyImplementationBuilder.Add(new PropertyImplementationModel(
+                propertyGenerationModelIndicesByImplementation[i],
+                interfaceTypeProvider.GetIndex(propertySymbol.ContainingType),
+                HasGetter: propertySymbol.GetMethod != null,
+                HasSetter: propertySymbol.SetMethod != null
+            ));
         }
 
         var propertyImplementations = propertyImplementationBuilder.ToImmutable();
@@ -95,17 +102,18 @@ internal static class InterfaceGenerationModelFactory
             hasEventMembers
         );
         var methodModels = methodContextProvider.Models;
+        var methodGenerationModelIndicesByImplementation =
+            methodContextProvider.GenerationModelIndicesByImplementation;
         var methodImplementationBuilder = ImmutableArray.CreateBuilder<MethodImplementationModel>();
 
-        foreach (var methodSymbol in methodSymbols)
+        for (var i = 0; i < methodSymbols.Length; i++)
         {
-            if (methodContextProvider.TryGetMethodModelIndex(methodSymbol, out var methodModelIndex))
-            {
-                methodImplementationBuilder.Add(new MethodImplementationModel(
-                    methodModelIndex,
-                    interfaceTypeProvider.GetIndex(methodSymbol.ContainingType)
-                ));
-            }
+            var methodSymbol = methodSymbols[i];
+
+            methodImplementationBuilder.Add(new MethodImplementationModel(
+                methodGenerationModelIndicesByImplementation[i],
+                interfaceTypeProvider.GetIndex(methodSymbol.ContainingType)
+            ));
         }
 
         var methodImplementations = methodImplementationBuilder.ToImmutable();

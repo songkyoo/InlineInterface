@@ -14,8 +14,8 @@ internal sealed class MethodContextProvider(
 {
     #region Nested Types
     private sealed record ProviderCache(
-        ImmutableSortedDictionary<string, ImmutableArray<MethodContext>> Contexts,
-        ImmutableArray<MethodGenerationModel> Models
+        ImmutableArray<MethodGenerationModel> Models,
+        ImmutableArray<int> GenerationModelIndicesByImplementation
     );
     #endregion
 
@@ -28,6 +28,7 @@ internal sealed class MethodContextProvider(
     )
     {
         var builder = new SortedDictionary<string, List<MethodContext>>();
+        var implementationContexts = new List<MethodContext>();
 
         foreach (var methodSymbol in methodSymbols)
         {
@@ -39,92 +40,109 @@ internal sealed class MethodContextProvider(
                 builder.Add(methodSymbol.Name, contexts);
             }
 
-            if (contexts.Any(x => MatchesMethodSignature(methodSymbol, x.ReturnTypeSymbol, x.ParameterTypeSymbols)))
+            MethodContext? context = null;
+
+            foreach (var existingContext in contexts)
             {
-                continue;
+                if (MatchesMethodSignature(
+                    methodSymbol,
+                    existingContext.ReturnTypeSymbol,
+                    existingContext.ParameterTypeSymbols
+                ))
+                {
+                    context = existingContext;
+
+                    break;
+                }
             }
 
-            var uniqueName = $"Method_{methodName}_{contexts.Count}";
-            var parameterName = $"method_{methodName}_{contexts.Count}";
-            var fieldName = $"_{parameterName}";
-
-            var paramTypes = new List<string>();
-            var parameters = new List<string>();
-            var arguments = new List<string>();
-
-            if (hasEventMembers)
+            if (context is null)
             {
-                paramTypes.Add($"{globalTypeBuilder}.EventDispatcher");
-                arguments.Add("_eventDispatcher");
+                var uniqueName = $"Method_{methodName}_{contexts.Count}";
+                var parameterName = $"method_{methodName}_{contexts.Count}";
+                var fieldName = $"_{parameterName}";
+
+                var paramTypes = new List<string>();
+                var parameters = new List<string>();
+                var arguments = new List<string>();
+
+                if (hasEventMembers)
+                {
+                    paramTypes.Add($"{globalTypeBuilder}.EventDispatcher");
+                    arguments.Add("_eventDispatcher");
+                }
+
+                foreach (var paramSymbol in methodSymbol.Parameters)
+                {
+                    var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
+
+                    paramTypes.Add(type);
+                    parameters.Add($"{type} {name}");
+                    arguments.Add(name);
+                }
+
+                var paramTypeList = string.Join(", ", paramTypes);
+
+                string returnType;
+                string delegateType;
+
+                if (methodSymbol.ReturnsVoid)
+                {
+                    returnType = "void";
+                    delegateType = paramTypeList.Length > 0
+                        ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
+                        : $"global::System.Action";
+                }
+                else
+                {
+                    returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
+                    delegateType = paramTypeList.Length > 0
+                        ? $"global::System.Func<{paramTypeList}, {returnType}>"
+                        : $"global::System.Func<{returnType}>";
+                }
+
+                context = new MethodContext(
+                    methodSymbol.ReturnType,
+                    methodSymbol.Parameters,
+                    new MethodGenerationModel(
+                        ReturnType: returnType,
+                        Parameters: string.Join(", ", parameters),
+                        Arguments: string.Join(", ", arguments),
+                        DelegateType: delegateType,
+                        Name: methodName,
+                        UniqueName: uniqueName,
+                        ParameterName: parameterName,
+                        FieldName: fieldName
+                    )
+                );
+
+                contexts.Add(context);
             }
 
-            foreach (var paramSymbol in methodSymbol.Parameters)
-            {
-                var (type, name) = GetParameterString(paramSymbol, genericParameterMap);
-
-                paramTypes.Add(type);
-                parameters.Add($"{type} {name}");
-                arguments.Add(name);
-            }
-
-            var paramTypeList = string.Join(", ", paramTypes);
-
-            string returnType;
-            string delegateType;
-
-            if (methodSymbol.ReturnsVoid)
-            {
-                returnType = "void";
-                delegateType = paramTypeList.Length > 0
-                    ? $"global::System.Action<{string.Join(", ", paramTypeList)}>"
-                    : $"global::System.Action";
-            }
-            else
-            {
-                returnType = SymbolHelpers.GetTypeString(methodSymbol.ReturnType, genericParameterMap);
-                delegateType = paramTypeList.Length > 0
-                    ? $"global::System.Func<{paramTypeList}, {returnType}>"
-                    : $"global::System.Func<{returnType}>";
-            }
-
-            var newContext = new MethodContext(
-                ReturnTypeSymbol: methodSymbol.ReturnType,
-                ParameterTypeSymbols: methodSymbol.Parameters,
-                Model: new MethodGenerationModel(
-                    ReturnType: returnType,
-                    Parameters: string.Join(", ", parameters),
-                    Arguments: string.Join(", ", arguments),
-                    DelegateType: delegateType,
-                    Name: methodName,
-                    UniqueName: uniqueName,
-                    ParameterName: parameterName,
-                    FieldName: fieldName
-                )
-            );
-
-            contexts.Add(newContext);
+            implementationContexts.Add(context);
         }
 
-        var contextCacheBuilder = ImmutableSortedDictionary.CreateBuilder<string, ImmutableArray<MethodContext>>();
         var modelBuilder = ImmutableArray.CreateBuilder<MethodGenerationModel>();
 
         foreach (var pair in builder)
         {
-            var contexts = pair.Value;
-            var contextBuilder = ImmutableArray.CreateBuilder<MethodContext>(contexts.Count);
-
-            foreach (var context in contexts)
+            foreach (var context in pair.Value)
             {
-                contextBuilder.Add(context with { ModelIndex = modelBuilder.Count });
+                context.ModelIndex = modelBuilder.Count;
                 modelBuilder.Add(context.Model);
             }
+        }
 
-            contextCacheBuilder.Add(pair.Key, contextBuilder.ToImmutable());
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+
+        foreach (var context in implementationContexts)
+        {
+            indexBuilder.Add(context.ModelIndex);
         }
 
         return new ProviderCache(
-            Contexts: contextCacheBuilder.ToImmutable(),
-            Models: modelBuilder.ToImmutable()
+            Models: modelBuilder.ToImmutable(),
+            GenerationModelIndicesByImplementation: indexBuilder.ToImmutable()
         );
     }
 
@@ -182,43 +200,7 @@ internal sealed class MethodContextProvider(
 
     #region Properties
     public ImmutableArray<MethodGenerationModel> Models => _cache.Models;
-    #endregion
-
-    #region Methods
-    public bool TryGetMethodModelIndex(
-        IMethodSymbol methodSymbol,
-        out int modelIndex
-    )
-    {
-        if (!_cache.Contexts.TryGetValue(methodSymbol.Name, out var contexts))
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        var index = -1;
-
-        for (var i = 0; i < contexts.Length; i++)
-        {
-            if (MatchesMethodSignature(methodSymbol, contexts[i].ReturnTypeSymbol, contexts[i].ParameterTypeSymbols))
-            {
-                index = i;
-
-                break;
-            }
-        }
-
-        if (index == -1)
-        {
-            modelIndex = -1;
-
-            return false;
-        }
-
-        modelIndex = contexts[index].ModelIndex;
-
-        return true;
-    }
+    public ImmutableArray<int> GenerationModelIndicesByImplementation =>
+        _cache.GenerationModelIndicesByImplementation;
     #endregion
 }

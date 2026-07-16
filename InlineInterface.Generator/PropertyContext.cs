@@ -3,9 +3,17 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal sealed record PropertyContext(
-    ITypeSymbol TypeSymbol,
-    ImmutableArray<IParameterSymbol> ParameterSymbols,
-    PropertyGenerationModel Model,
-    int ModelIndex = -1
-);
+internal sealed class PropertyContext(
+    ITypeSymbol typeSymbol,
+    ImmutableArray<IParameterSymbol> parameterSymbols,
+    PropertyGenerationModel model
+)
+{
+    public ITypeSymbol TypeSymbol { get; } = typeSymbol;
+
+    public ImmutableArray<IParameterSymbol> ParameterSymbols { get; } = parameterSymbols;
+
+    public PropertyGenerationModel Model { get; set; } = model;
+
+    public int ModelIndex { get; set; } = -1;
+}
