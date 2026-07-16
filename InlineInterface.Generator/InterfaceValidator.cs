@@ -6,9 +6,13 @@ namespace Macaron.InlineInterface;
 
 internal static class InterfaceValidator
 {
-    public static TargetInterfaceValidationResult ValidateTargetInterface(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
+    public static TargetInterfaceValidationResult ValidateTargetInterface(
+        INamedTypeSymbol interfaceSymbol,
+        TypeSyntax typeSyntax,
+        CancellationToken cancellationToken = default
+    )
     {
-        var result = ValidateTargetInterface(interfaceSymbol);
+        var result = ValidateTargetInterface(interfaceSymbol, cancellationToken);
 
         if (result is TargetInterfaceSymbolValidationResult.Success success)
         {
@@ -23,29 +27,38 @@ internal static class InterfaceValidator
 
         foreach (var issue in failure.Issues)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             diagnosticsBuilder.Add(issue.CreateDiagnostic(typeSyntax));
         }
 
         return new TargetInterfaceValidationResult.Failure(diagnosticsBuilder.ToImmutable());
     }
 
-    public static TargetInterfaceSymbolValidationResult ValidateTargetInterface(INamedTypeSymbol interfaceSymbol)
+    public static TargetInterfaceSymbolValidationResult ValidateTargetInterface(
+        INamedTypeSymbol interfaceSymbol,
+        CancellationToken cancellationToken = default
+    )
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var interfaceContextsBuilder = ImmutableArray.CreateBuilder<InterfaceContext>();
         var issuesBuilder = ImmutableArray.CreateBuilder<InterfaceValidationIssue>();
 
-        foreach (var symbol in new[] { interfaceSymbol }.Concat(interfaceSymbol.AllInterfaces))
-        {
-            var result = ValidateInterfaceMembers(symbol);
+        AddValidationResult(
+            ValidateInterfaceMembers(interfaceSymbol, cancellationToken),
+            interfaceContextsBuilder,
+            issuesBuilder
+        );
 
-            if (result.TryGetContext(out var interfaceContext))
-            {
-                interfaceContextsBuilder.Add(interfaceContext);
-            }
-            else if (result.TryGetIssues(out var issues))
-            {
-                issuesBuilder.AddRange(issues);
-            }
+        foreach (var inheritedInterfaceSymbol in interfaceSymbol.AllInterfaces)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            AddValidationResult(
+                ValidateInterfaceMembers(inheritedInterfaceSymbol, cancellationToken),
+                interfaceContextsBuilder,
+                issuesBuilder
+            );
         }
 
         return issuesBuilder.Count > 0
@@ -56,7 +69,26 @@ internal static class InterfaceValidator
             );
     }
 
-    private static InterfaceMemberValidationResult ValidateInterfaceMembers(INamedTypeSymbol interfaceSymbol)
+    private static void AddValidationResult(
+        InterfaceMemberValidationResult result,
+        ImmutableArray<InterfaceContext>.Builder interfaceContextsBuilder,
+        ImmutableArray<InterfaceValidationIssue>.Builder issuesBuilder
+    )
+    {
+        if (result.TryGetContext(out var interfaceContext))
+        {
+            interfaceContextsBuilder.Add(interfaceContext);
+        }
+        else if (result.TryGetIssues(out var issues))
+        {
+            issuesBuilder.AddRange(issues);
+        }
+    }
+
+    private static InterfaceMemberValidationResult ValidateInterfaceMembers(
+        INamedTypeSymbol interfaceSymbol,
+        CancellationToken cancellationToken
+    )
     {
         var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
         var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
@@ -65,6 +97,8 @@ internal static class InterfaceValidator
 
         foreach (var member in interfaceSymbol.GetMembers())
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             switch (member)
             {
                 case IPropertySymbol { IsStatic: false } property:
@@ -76,10 +110,7 @@ internal static class InterfaceValidator
                 case IEventSymbol { IsStatic: false } @event:
                 {
                     if (@event.Type is INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod }
-                        && invokeMethod.Parameters.Any(paramSymbol =>
-                        {
-                            return paramSymbol.RefKind is not RefKind.None and not RefKind.In || paramSymbol.IsParams;
-                        })
+                        && HasUnsupportedEventParameter(invokeMethod.Parameters, cancellationToken)
                     )
                     {
                         issuesBuilder.Add(new InterfaceValidationIssue(
@@ -114,11 +145,7 @@ internal static class InterfaceValidator
                         break;
                     }
 
-                    if (method.Parameters.Any(paramSymbol =>
-                        {
-                            return paramSymbol.RefKind != RefKind.None || paramSymbol.IsParams;
-                        })
-                    )
+                    if (HasUnsupportedMethodParameter(method.Parameters, cancellationToken))
                     {
                         issuesBuilder.Add(new InterfaceValidationIssue(
                             Kind: InterfaceValidationIssueKind.NotAllowedMethodModifier,
@@ -159,5 +186,41 @@ internal static class InterfaceValidator
             PropertySymbols: propertySymbolsBuilder.ToImmutable(),
             MethodSymbols: methodSymbolsBuilder.ToImmutable()
         ));
+    }
+
+    private static bool HasUnsupportedEventParameter(
+        ImmutableArray<IParameterSymbol> parameters,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var parameter in parameters)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (parameter.RefKind is not RefKind.None and not RefKind.In || parameter.IsParams)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasUnsupportedMethodParameter(
+        ImmutableArray<IParameterSymbol> parameters,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var parameter in parameters)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (parameter.RefKind != RefKind.None || parameter.IsParams)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

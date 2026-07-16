@@ -233,6 +233,74 @@ public partial class InlineInterfaceGeneratorTests
     }
 
     [Test]
+    public void InterfaceValidatorHonorsCancellation()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+            """
+        );
+        var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        Assert.That(
+            () => InterfaceValidator.ValidateTargetInterface(
+                interfaceSymbol,
+                cancellationTokenSource.Token
+            ),
+            Throws.TypeOf<OperationCanceledException>()
+        );
+    }
+
+    [Test]
+    public void RequiredBuilderMemberProviderDoesNotCacheCancellation()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+            """
+        );
+        var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
+        var provider = new RequiredBuilderMemberProvider();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        Assert.That(
+            () => provider.TryGetRequiredMembers(
+                interfaceSymbol,
+                cancellationTokenSource.Token,
+                out _
+            ),
+            Throws.TypeOf<OperationCanceledException>()
+        );
+
+        var isValid = provider.TryGetRequiredMembers(
+            interfaceSymbol,
+            CancellationToken.None,
+            out var requiredMembers
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(isValid, Is.True);
+            Assert.That(requiredMembers, Has.Length.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void MethodSignatureComparerUsesReturnAndParameterTypes()
     {
         var compilation = CreateCompilation(
@@ -405,7 +473,8 @@ public partial class InlineInterfaceGeneratorTests
             var provider = context.SyntaxProvider
                 .CreateSyntaxProvider(
                     predicate: static (node, _) => TargetTypeExtractor.IsCandidate(node),
-                    transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
+                    transform: static (generatorSyntaxContext, cancellationToken) =>
+                        TargetTypeExtractor.Discover(generatorSyntaxContext, cancellationToken)
                 )
                 .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);
 

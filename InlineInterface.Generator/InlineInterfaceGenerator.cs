@@ -15,7 +15,8 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             .SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (syntaxNode, _) => TargetTypeExtractor.IsCandidate(syntaxNode),
-                transform: static (generatorSyntaxContext, _) => TargetTypeExtractor.Discover(generatorSyntaxContext)
+                transform: static (generatorSyntaxContext, cancellationToken) =>
+                    TargetTypeExtractor.Discover(generatorSyntaxContext, cancellationToken)
             )
             .Where(static result => result is not TargetTypeDiscoveryResult.NotApplicable);
 
@@ -25,6 +26,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
                 .Select(static (result, _) => (TargetTypeDiscoveryResult.Failure)result),
             action: static (sourceProductionContext, failure) =>
             {
+                sourceProductionContext.CancellationToken.ThrowIfCancellationRequested();
                 sourceProductionContext.ReportDiagnostic(failure.Diagnostic);
             }
         );
@@ -33,19 +35,25 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             .Where(static result => result is TargetTypeDiscoveryResult.Success)
             .Select(static (result, _) => (TargetTypeDiscoveryResult.Success)result)
             .Collect()
-            .SelectMany(static (results, _) =>
+            .SelectMany(static (results, cancellationToken) =>
             {
                 var seenTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
                 var builder = new List<TargetInterfaceValidationResult>();
 
                 foreach (var success in results)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (!seenTypes.Add(success.Symbol))
                     {
                         continue;
                     }
 
-                    builder.Add(InterfaceValidator.ValidateTargetInterface(success.Symbol, success.Syntax));
+                    builder.Add(InterfaceValidator.ValidateTargetInterface(
+                        success.Symbol,
+                        success.Syntax,
+                        cancellationToken
+                    ));
                 }
 
                 return builder;
@@ -59,6 +67,7 @@ public sealed class InlineInterfaceGenerator : IIncrementalGenerator
             {
                 foreach (var diagnostic in failure.Diagnostics)
                 {
+                    sourceProductionContext.CancellationToken.ThrowIfCancellationRequested();
                     sourceProductionContext.ReportDiagnostic(diagnostic);
                 }
             }

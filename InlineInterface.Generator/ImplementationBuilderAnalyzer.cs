@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -26,13 +25,10 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.RegisterCompilationStartAction(static compilationStartContext =>
         {
-            var requiredMembersCache = new ConcurrentDictionary<
-                INamedTypeSymbol,
-                Lazy<RequiredBuilderMembersResult>
-            >(SymbolEqualityComparer.Default);
+            var requiredMemberProvider = new RequiredBuilderMemberProvider();
 
             compilationStartContext.RegisterSyntaxNodeAction(
-                context => AnalyzeInvocation(context, requiredMembersCache),
+                context => AnalyzeInvocation(context, requiredMemberProvider),
                 SyntaxKind.InvocationExpression
             );
         });
@@ -40,7 +36,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeInvocation(
         SyntaxNodeAnalysisContext context,
-        ConcurrentDictionary<INamedTypeSymbol, Lazy<RequiredBuilderMembersResult>> requiredMembersCache
+        RequiredBuilderMemberProvider requiredMemberProvider
     )
     {
         if (context.Node is not InvocationExpressionSyntax invocation ||
@@ -87,34 +83,45 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var requiredMembersResult = GetRequiredBuilderMembersResult(requiredMembersCache, target);
-
-        if (!requiredMembersResult.IsValid)
+        if (!requiredMemberProvider.TryGetRequiredMembers(
+            target.InterfaceSymbol,
+            context.CancellationToken,
+            out var requiredMembers
+        ))
         {
             return;
         }
 
-        var configuredMemberKeys = new HashSet<BuilderMemberKey>(BuilderMemberKeyComparer.Instance);
+        var configuredMemberSignatures = new HashSet<BuilderMemberSignature>(
+            BuilderMemberSignatureComparer.Instance
+        );
 
         for (var i = 1; i < chainInvocations.Length - 1; i++)
         {
-            if (GetBuilderMemberKey(chainOperations[i].TargetMethod) is { } key)
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (BuilderMemberSignatureFactory.TryCreate(
+                chainOperations[i].TargetMethod,
+                out var signature
+            ))
             {
-                configuredMemberKeys.Add(key);
+                configuredMemberSignatures.Add(signature);
             }
         }
 
         ImmutableArray<string>.Builder? missingMembersBuilder = null;
 
-        foreach (var member in requiredMembersResult.Members)
+        foreach (var member in requiredMembers)
         {
-            if (configuredMemberKeys.Contains(member.Key))
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (configuredMemberSignatures.Contains(member.Signature))
             {
                 continue;
             }
 
             missingMembersBuilder ??= ImmutableArray.CreateBuilder<string>();
-            missingMembersBuilder.Add(CreateRequiredBuilderMemberDescription(member));
+            missingMembersBuilder.Add(member.CreateDescription(context.CancellationToken));
         }
 
         if (missingMembersBuilder is null)
@@ -130,241 +137,6 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
                 string.Join(", ", missingMembersBuilder),
             ]
         ));
-    }
-
-    private static RequiredBuilderMembersResult GetRequiredBuilderMembersResult(
-        ConcurrentDictionary<INamedTypeSymbol, Lazy<RequiredBuilderMembersResult>> requiredMembersCache,
-        ImplementationOfTarget target
-    )
-    {
-        var lazyResult = requiredMembersCache.GetOrAdd(
-            target.InterfaceSymbol,
-            interfaceSymbol => new Lazy<RequiredBuilderMembersResult>(
-                () => CreateRequiredBuilderMembersResult(interfaceSymbol),
-                LazyThreadSafetyMode.ExecutionAndPublication
-            )
-        );
-
-        return lazyResult.Value;
-    }
-
-    private static RequiredBuilderMembersResult CreateRequiredBuilderMembersResult(INamedTypeSymbol interfaceSymbol)
-    {
-        return InterfaceValidator.ValidateTargetInterface(interfaceSymbol)
-            is TargetInterfaceSymbolValidationResult.Success validationResult
-                ? new RequiredBuilderMembersResult(
-                    IsValid: true,
-                    Members: GetRequiredBuilderMembers(validationResult.Contexts)
-                )
-                : new RequiredBuilderMembersResult(
-                    IsValid: false,
-                    Members: ImmutableArray<RequiredBuilderMember>.Empty
-                );
-    }
-
-    private static ImmutableArray<RequiredBuilderMember> GetRequiredBuilderMembers(
-        ImmutableArray<InterfaceContext> interfaceContexts
-    )
-    {
-        var builder = ImmutableArray.CreateBuilder<RequiredBuilderMember>();
-        var methodSignatures = new HashSet<MethodSignature>(MethodSignatureComparer.Instance);
-        var propertyMap = new Dictionary<PropertySignature, PropertyRequirement>(
-            PropertySignatureComparer.Instance
-        );
-
-        foreach (var methodSymbol in interfaceContexts.SelectMany(static ctx => ctx.MethodSymbols))
-        {
-            if (methodSymbol.MethodKind
-                is MethodKind.EventAdd or MethodKind.EventRemove
-                or MethodKind.PropertyGet or MethodKind.PropertySet
-            )
-            {
-                continue;
-            }
-
-            var methodSignature = MethodSignature.Create(methodSymbol);
-
-            if (methodSignatures.Add(methodSignature))
-            {
-                var builderMemberKey = CreateMethodBuilderMemberKey(methodSignature);
-
-                builder.Add(new RequiredBuilderMember(
-                    Key: builderMemberKey,
-                    Symbol: methodSymbol,
-                    Kind: RequiredBuilderMemberKind.Method
-                ));
-            }
-        }
-
-        foreach (var propertySymbol in interfaceContexts.SelectMany(static ctx => ctx.PropertySymbols))
-        {
-            var propertySignature = PropertySignature.Create(propertySymbol);
-
-            if (!propertyMap.TryGetValue(propertySignature, out var existing))
-            {
-                propertyMap.Add(propertySignature, new PropertyRequirement(
-                    Symbol: propertySymbol,
-                    RequiresGetter: propertySymbol.GetMethod != null,
-                    RequiresSetter: propertySymbol.SetMethod != null
-                ));
-
-                continue;
-            }
-
-            propertyMap[propertySignature] = existing with
-            {
-                RequiresGetter = existing.RequiresGetter || propertySymbol.GetMethod != null,
-                RequiresSetter = existing.RequiresSetter || propertySymbol.SetMethod != null,
-            };
-        }
-
-        foreach (var requirement in propertyMap.Values)
-        {
-            var delegateSignatures = ImmutableArray.CreateBuilder<DelegateSignatureKey>();
-
-            if (requirement.RequiresGetter)
-            {
-                delegateSignatures.Add(CreateDelegateSignature(
-                    returnType: requirement.Symbol.Type,
-                    parameters: requirement.Symbol.Parameters
-                ));
-            }
-
-            if (requirement.RequiresSetter)
-            {
-                delegateSignatures.Add(CreateDelegateSignature(
-                    returnType: null,
-                    parameters: requirement.Symbol.Parameters,
-                    trailingParameterType: requirement.Symbol.Type
-                ));
-            }
-
-            builder.Add(new RequiredBuilderMember(
-                Key: new BuilderMemberKey(
-                    ApiName: requirement.Symbol.IsIndexer ? "Indexer" : requirement.Symbol.Name,
-                    DelegateSignatures: delegateSignatures.ToImmutable()
-                ),
-                Symbol: requirement.Symbol,
-                Kind: requirement.Symbol.IsIndexer
-                    ? RequiredBuilderMemberKind.Indexer
-                    : RequiredBuilderMemberKind.Property
-            ));
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private static BuilderMemberKey? GetBuilderMemberKey(IMethodSymbol methodSymbol)
-    {
-        var delegateSignatures = ImmutableArray.CreateBuilder<DelegateSignatureKey>();
-        var parameterOffset = methodSymbol.IsExtensionMethod && methodSymbol.ReducedFrom is null ? 1 : 0;
-
-        for (var i = parameterOffset; i < methodSymbol.Parameters.Length; i++)
-        {
-            var parameterSymbol = methodSymbol.Parameters[i];
-
-            if (parameterSymbol.Type is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
-            {
-                return null;
-            }
-
-            var delegateParameterOffset = HasEventDispatcherParameter(invokeMethod.Parameters) ? 1 : 0;
-
-            delegateSignatures.Add(CreateDelegateSignature(
-                returnType: invokeMethod.ReturnsVoid ? null : invokeMethod.ReturnType,
-                parameters: invokeMethod.Parameters,
-                parameterOffset: delegateParameterOffset
-            ));
-        }
-
-        return new BuilderMemberKey(methodSymbol.Name, delegateSignatures.ToImmutable());
-    }
-
-    private static bool HasEventDispatcherParameter(ImmutableArray<IParameterSymbol> parameters)
-    {
-        return parameters.Length > 0 && parameters[0].Type is INamedTypeSymbol { Name: "EventDispatcher" };
-    }
-
-    private static BuilderMemberKey CreateMethodBuilderMemberKey(MethodSignature methodSignature)
-    {
-        return new BuilderMemberKey(
-            ApiName: methodSignature.Name,
-            DelegateSignatures: ImmutableArray.Create(new DelegateSignatureKey(
-                ReturnType: methodSignature.ReturnType.SpecialType == SpecialType.System_Void
-                    ? null
-                    : methodSignature.ReturnType,
-                ParameterTypes: GetParameterTypes(methodSignature.Parameters)
-            ))
-        );
-    }
-
-    private static DelegateSignatureKey CreateDelegateSignature(
-        ITypeSymbol? returnType,
-        ImmutableArray<IParameterSymbol> parameters,
-        int parameterOffset = 0,
-        ITypeSymbol? trailingParameterType = null
-    )
-    {
-        return new DelegateSignatureKey(
-            ReturnType: returnType,
-            ParameterTypes: GetParameterTypes(parameters, parameterOffset, trailingParameterType)
-        );
-    }
-
-    private static ImmutableArray<ITypeSymbol> GetParameterTypes(
-        ImmutableArray<IParameterSymbol> parameters,
-        int parameterOffset = 0,
-        ITypeSymbol? trailingParameterType = null
-    )
-    {
-        var trailingParameterCount = trailingParameterType is null ? 0 : 1;
-        var builder = ImmutableArray.CreateBuilder<ITypeSymbol>(
-            parameters.Length - parameterOffset + trailingParameterCount
-        );
-
-        for (var i = parameterOffset; i < parameters.Length; i++)
-        {
-            builder.Add(parameters[i].Type);
-        }
-
-        if (trailingParameterType is not null)
-        {
-            builder.Add(trailingParameterType);
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private static string CreateRequiredBuilderMemberDescription(RequiredBuilderMember member)
-    {
-        return member switch
-        {
-            { Kind: RequiredBuilderMemberKind.Method, Symbol: IMethodSymbol methodSymbol } =>
-                $"method '{CreateMethodDisplay(methodSymbol)}'",
-            { Kind: RequiredBuilderMemberKind.Indexer, Symbol: IPropertySymbol propertySymbol } =>
-                $"indexer '{CreateIndexerDisplay(propertySymbol)}'",
-            { Kind: RequiredBuilderMemberKind.Property, Symbol: IPropertySymbol propertySymbol } =>
-                $"property '{propertySymbol.Name}'",
-            _ => throw new InvalidOperationException("Unexpected required builder member."),
-        };
-    }
-
-    private static string CreateMethodDisplay(IMethodSymbol methodSymbol)
-    {
-        var parameters = string.Join(", ", methodSymbol.Parameters.Select(
-            parameter => $"{parameter.Type.ToDisplayString(MinimallyQualifiedFormat)} {parameter.Name}"
-        ));
-
-        return $"{methodSymbol.Name}({parameters})";
-    }
-
-    private static string CreateIndexerDisplay(IPropertySymbol propertySymbol)
-    {
-        var parameters = string.Join(", ", propertySymbol.Parameters.Select(
-            parameter => $"{parameter.Type.ToDisplayString(MinimallyQualifiedFormat)} {parameter.Name}"
-        ));
-
-        return $"this[{parameters}]";
     }
 
     private static bool IsBuildInvocation(InvocationExpressionSyntax invocation)
@@ -534,90 +306,4 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
     }
 
     private readonly record struct ImplementationOfTarget(INamedTypeSymbol InterfaceSymbol);
-
-    private readonly record struct BuilderMemberKey(
-        string ApiName,
-        ImmutableArray<DelegateSignatureKey> DelegateSignatures
-    );
-
-    private readonly record struct DelegateSignatureKey(
-        ITypeSymbol? ReturnType,
-        ImmutableArray<ITypeSymbol> ParameterTypes
-    );
-
-    private readonly record struct RequiredBuilderMember(
-        BuilderMemberKey Key,
-        ISymbol Symbol,
-        RequiredBuilderMemberKind Kind
-    );
-
-    private readonly record struct RequiredBuilderMembersResult(
-        bool IsValid,
-        ImmutableArray<RequiredBuilderMember> Members
-    );
-
-    private readonly record struct PropertyRequirement(
-        IPropertySymbol Symbol,
-        bool RequiresGetter,
-        bool RequiresSetter
-    );
-
-    private enum RequiredBuilderMemberKind
-    {
-        Method,
-        Property,
-        Indexer,
-    }
-
-    private sealed class BuilderMemberKeyComparer : IEqualityComparer<BuilderMemberKey>
-    {
-        public static BuilderMemberKeyComparer Instance { get; } = new();
-
-        public bool Equals(BuilderMemberKey left, BuilderMemberKey right)
-        {
-            if (!StringComparer.Ordinal.Equals(left.ApiName, right.ApiName) ||
-                left.DelegateSignatures.Length != right.DelegateSignatures.Length
-            )
-            {
-                return false;
-            }
-
-            for (var i = 0; i < left.DelegateSignatures.Length; i++)
-            {
-                var leftSignature = left.DelegateSignatures[i];
-                var rightSignature = right.DelegateSignatures[i];
-
-                if (!SymbolEqualityComparer.Default.Equals(leftSignature.ReturnType, rightSignature.ReturnType) ||
-                    !InterfaceMemberSignatureHelpers.TypeSymbolsEqual(
-                        leftSignature.ParameterTypes,
-                        rightSignature.ParameterTypes
-                    )
-                )
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public int GetHashCode(BuilderMemberKey key)
-        {
-            var hashCode = StringComparer.Ordinal.GetHashCode(key.ApiName);
-            hashCode = unchecked(hashCode * 31 + key.DelegateSignatures.Length);
-
-            foreach (var signature in key.DelegateSignatures)
-            {
-                hashCode = InterfaceMemberSignatureHelpers.AddTypeHashCode(hashCode, signature.ReturnType);
-                hashCode = unchecked(hashCode * 31 + signature.ParameterTypes.Length);
-
-                foreach (var parameterType in signature.ParameterTypes)
-                {
-                    hashCode = InterfaceMemberSignatureHelpers.AddTypeHashCode(hashCode, parameterType);
-                }
-            }
-
-            return hashCode;
-        }
-    }
 }

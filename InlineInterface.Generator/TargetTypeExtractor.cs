@@ -13,15 +13,26 @@ internal static class TargetTypeExtractor
         return GetCandidateGenericName(syntaxNode) is not null;
     }
 
-    public static TargetTypeDiscoveryResult Discover(GeneratorSyntaxContext generatorSyntaxContext)
+    public static TargetTypeDiscoveryResult Discover(
+        GeneratorSyntaxContext generatorSyntaxContext,
+        CancellationToken cancellationToken = default
+    )
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (GetCandidateGenericName(generatorSyntaxContext.Node) is not { } genericNameSyntax)
         {
             return TargetTypeDiscoveryResult.NotApplicable.Instance;
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
-        var methodSymbol = ModelExtensions.GetSymbolInfo(semanticModel, genericNameSyntax).Symbol as IMethodSymbol;
+        var methodSymbol = ModelExtensions
+            .GetSymbolInfo(
+                semanticModel,
+                genericNameSyntax,
+                cancellationToken
+            )
+            .Symbol as IMethodSymbol;
 
         if (methodSymbol?.IsStatic is not true ||
             methodSymbol.Name != "Of" ||

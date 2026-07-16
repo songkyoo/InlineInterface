@@ -324,6 +324,37 @@ public partial class InlineInterfaceGeneratorTests
     }
 
     [Test]
+    public void DoesNotTreatUserDefinedEventDispatcherAsGeneratedDispatcher()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public sealed class EventDispatcher
+            {
+            }
+
+            public interface IBuffer
+            {
+                void Write(EventDispatcher dispatcher);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Write(dispatcher => { })
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
     public void DoesNotReportMissingMembersForConfiguredConstructedInterface()
     {
         AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
