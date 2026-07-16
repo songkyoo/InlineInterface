@@ -101,27 +101,6 @@ internal static class InterfaceMemberSignatureHelpers
         return true;
     }
 
-    public static bool TypeSymbolsEqual(
-        ImmutableArray<ITypeSymbol> left,
-        ImmutableArray<ITypeSymbol> right
-    )
-    {
-        if (left.Length != right.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Length; i++)
-        {
-            if (!SymbolEqualityComparer.Default.Equals(left[i], right[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     public static int AddParametersHashCode(
         int hashCode,
         ImmutableArray<IParameterSymbol> parameters
