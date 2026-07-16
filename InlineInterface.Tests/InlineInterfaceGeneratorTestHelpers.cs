@@ -121,7 +121,10 @@ public partial class InlineInterfaceGeneratorTests
         Assert.That(actualDiagnosticIds, Has.Some.Matches(expectedDiagnosticId));
     }
 
-    private static ImmutableArray<Diagnostic> AnalyzeAndGetDiagnostics<TAnalyzer>(string sourceCode)
+    private static (
+        ImmutableArray<Diagnostic> compilerDiagnostics,
+        ImmutableArray<Diagnostic> analyzerDiagnostics
+    ) CompileAndAnalyze<TAnalyzer>(string sourceCode)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
         var compilation = CreateCompilation(
@@ -136,12 +139,23 @@ public partial class InlineInterfaceGeneratorTests
             out _
         );
 
-        return outputCompilation
+        var analyzerDiagnostics = outputCompilation
             .WithAnalyzers([new TAnalyzer()])
             .GetAnalyzerDiagnosticsAsync()
             .GetAwaiter()
             .GetResult()
             .ToImmutableArray();
+
+        return (
+            compilerDiagnostics: outputCompilation.GetDiagnostics(),
+            analyzerDiagnostics: analyzerDiagnostics
+        );
+    }
+
+    private static ImmutableArray<Diagnostic> AnalyzeAndGetDiagnostics<TAnalyzer>(string sourceCode)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        return CompileAndAnalyze<TAnalyzer>(sourceCode).analyzerDiagnostics;
     }
 
     private static void AssertAnalyzerDiagnostic<TAnalyzer>(string sourceCode, string expectedDiagnosticId)
@@ -158,11 +172,16 @@ public partial class InlineInterfaceGeneratorTests
     private static void AssertNoAnalyzerDiagnostic<TAnalyzer>(string sourceCode, string diagnosticId)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
-        var actualDiagnosticIds = AnalyzeAndGetDiagnostics<TAnalyzer>(sourceCode)
+        var (compilerDiagnostics, analyzerDiagnostics) = CompileAndAnalyze<TAnalyzer>(sourceCode);
+        var compilerErrors = compilerDiagnostics
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        var actualDiagnosticIds = analyzerDiagnostics
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .Select(diagnostic => diagnostic.Id)
             .ToArray();
 
+        Assert.That(compilerErrors, Is.Empty);
         Assert.That(actualDiagnosticIds, Has.None.Matches(diagnosticId));
     }
 

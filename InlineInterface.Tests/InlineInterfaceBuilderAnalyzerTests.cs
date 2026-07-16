@@ -349,4 +349,221 @@ public partial class InlineInterfaceGeneratorTests
             diagnosticId: "MII0009"
         );
     }
+
+    [Test]
+    public void ReportsDiagnosticWhenBuildIsMissingIndexerDelegates()
+    {
+        var diagnostic = AnalyzeAndGetDiagnostics<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IGrid
+            {
+                string this[int x, int y] { get; set; }
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IGrid>().Build();
+                }
+            }
+            """
+        ).Single(diagnostic => diagnostic.Id == "MII0009");
+
+        Assert.That(diagnostic.GetMessage(), Does.Contain("indexer 'this[int x, int y]'"));
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForConfiguredIndexer()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IGrid
+            {
+                string this[int x, int y] { get; set; }
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IGrid>()
+                        .Indexer(
+                            getter: (x, y) => "",
+                            setter: (x, y, value) => { }
+                        )
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForConfiguredMergedInheritedProperty()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IReadBuffer
+            {
+                string Value { get; }
+            }
+
+            public interface IWriteBuffer
+            {
+                string Value { set; }
+            }
+
+            public interface IBuffer : IReadBuffer, IWriteBuffer
+            {
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Value(
+                            getter: () => "",
+                            setter: value => { }
+                        )
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForPropertiesWithEventDispatcher()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using System;
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                event EventHandler Changed;
+                string Value { get; set; }
+                string this[int index] { get; set; }
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Value(
+                            getter: _ => "",
+                            setter: (_, value) => { }
+                        )
+                        .Indexer(
+                            getter: (_, index) => "",
+                            setter: (_, index, value) => { }
+                        )
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersWhenAllowMissingImplementationIsUnknown()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+
+            public class Test
+            {
+                public void M(bool allowMissingImplementation)
+                {
+                    _ = Implementation.Of<IBuffer>(allowMissingImplementation).Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForUnresolvedBuildInvocation()
+    {
+        var diagnosticIds = AnalyzeAndGetDiagnostics<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Write(value => { })
+                        .Build(42);
+                }
+            }
+            """
+        ).Select(diagnostic => diagnostic.Id).ToArray();
+
+        Assert.That(diagnosticIds, Has.None.Matches("MII0009"));
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForConfiguredNestedGenericInterface()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public class Outer<TOuter>
+            {
+                public interface IInner<TInner>
+                {
+                    TOuter GetOuter();
+                    TInner GetInner();
+                }
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<Outer<string>.IInner<int>>()
+                        .GetOuter(() => "")
+                        .GetInner(() => 0)
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
 }
