@@ -158,7 +158,9 @@ public partial class InlineInterfaceGeneratorTests
         Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Failure>());
 
         var failure = (TargetInterfaceValidationResult.Failure)result;
-        Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MII0003"));
+        var diagnostic = failure.Diagnostics.Single(diagnostic => diagnostic.Id == "MII0003");
+
+        Assert.That(diagnostic.Location.SourceSpan, Is.EqualTo(typeSyntax.Span));
     }
 
     [Test]
@@ -198,6 +200,145 @@ public partial class InlineInterfaceGeneratorTests
 
         var failure = (TargetInterfaceValidationResult.Failure)result;
         Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MII0007"));
+    }
+
+    [Test]
+    public void InterfaceValidatorReturnsSymbolIssuesWithoutTypeSyntax()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface IBuffer
+            {
+                void Update<T>(T value);
+            }
+            """
+        );
+        var interfaceSymbol = GetNamedTypeSymbol(compilation, "Macaron.InlineInterface.Tests.IBuffer");
+
+        var result = InterfaceValidator.ValidateTargetInterface(interfaceSymbol);
+
+        Assert.That(result, Is.TypeOf<TargetInterfaceSymbolValidationResult.Failure>());
+
+        var failure = (TargetInterfaceSymbolValidationResult.Failure)result;
+
+        Assert.That(failure.Issues, Has.Length.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure.Issues[0].Kind, Is.EqualTo(InterfaceValidationIssueKind.NotAllowedGenericMethod));
+            Assert.That(failure.Issues[0].MemberName, Is.EqualTo("Update"));
+        });
+    }
+
+    [Test]
+    public void MethodSignatureComparerUsesReturnAndParameterTypes()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface ILeft
+            {
+                string Read(int value);
+            }
+
+            public interface IRight
+            {
+                string Read(int value);
+            }
+
+            public interface IDifferentReturn
+            {
+                object Read(int value);
+            }
+
+            public interface IDifferentParameter
+            {
+                string Read(string value);
+            }
+            """
+        );
+
+        var left = MethodSignature.Create(GetNamedTypeSymbol(
+            compilation,
+            "Macaron.InlineInterface.Tests.ILeft"
+        ).GetMembers("Read").OfType<IMethodSymbol>().Single());
+        var right = MethodSignature.Create(GetNamedTypeSymbol(
+            compilation,
+            "Macaron.InlineInterface.Tests.IRight"
+        ).GetMembers("Read").OfType<IMethodSymbol>().Single());
+        var differentReturn = MethodSignature.Create(GetNamedTypeSymbol(
+            compilation,
+            "Macaron.InlineInterface.Tests.IDifferentReturn"
+        ).GetMembers("Read").OfType<IMethodSymbol>().Single());
+        var differentParameter = MethodSignature.Create(GetNamedTypeSymbol(
+            compilation,
+            "Macaron.InlineInterface.Tests.IDifferentParameter"
+        ).GetMembers("Read").OfType<IMethodSymbol>().Single());
+        var comparer = MethodSignatureComparer.Instance;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(comparer.Equals(left, right), Is.True);
+            Assert.That(comparer.GetHashCode(left), Is.EqualTo(comparer.GetHashCode(right)));
+            Assert.That(comparer.Equals(left, differentReturn), Is.False);
+            Assert.That(comparer.Equals(left, differentParameter), Is.False);
+        });
+    }
+
+    [Test]
+    public void PropertySignatureComparerIgnoresAccessorsAndUsesIndexerParameters()
+    {
+        var compilation = CreateCompilation(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public interface IReadBuffer
+            {
+                string Value { get; }
+            }
+
+            public interface IWriteBuffer
+            {
+                string Value { set; }
+            }
+
+            public interface IIntIndexer
+            {
+                string this[int index] { get; }
+            }
+
+            public interface IStringIndexer
+            {
+                string this[string index] { get; }
+            }
+            """
+        );
+
+        static PropertySignature GetSignature(CSharpCompilation compilation, string metadataName)
+        {
+            return PropertySignature.Create(GetNamedTypeSymbol(
+                compilation,
+                metadataName
+            ).GetMembers().OfType<IPropertySymbol>().Single());
+        }
+
+        var read = GetSignature(compilation, "Macaron.InlineInterface.Tests.IReadBuffer");
+        var write = GetSignature(compilation, "Macaron.InlineInterface.Tests.IWriteBuffer");
+        var intIndexer = GetSignature(compilation, "Macaron.InlineInterface.Tests.IIntIndexer");
+        var stringIndexer = GetSignature(compilation, "Macaron.InlineInterface.Tests.IStringIndexer");
+        var comparer = PropertySignatureComparer.Instance;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(comparer.Equals(read, write), Is.True);
+            Assert.That(comparer.GetHashCode(read), Is.EqualTo(comparer.GetHashCode(write)));
+            Assert.That(comparer.Equals(intIndexer, stringIndexer), Is.False);
+        });
     }
 
     [Test]

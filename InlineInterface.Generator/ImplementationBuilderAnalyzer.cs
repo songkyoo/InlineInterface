@@ -137,11 +137,10 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         ImplementationOfTarget target
     )
     {
-        var typeSyntax = target.TypeSyntax;
         var lazyResult = requiredMembersCache.GetOrAdd(
             target.InterfaceSymbol,
             interfaceSymbol => new Lazy<RequiredBuilderMembersResult>(
-                () => CreateRequiredBuilderMembersResult(interfaceSymbol, typeSyntax),
+                () => CreateRequiredBuilderMembersResult(interfaceSymbol),
                 LazyThreadSafetyMode.ExecutionAndPublication
             )
         );
@@ -149,13 +148,10 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         return lazyResult.Value;
     }
 
-    private static RequiredBuilderMembersResult CreateRequiredBuilderMembersResult(
-        INamedTypeSymbol interfaceSymbol,
-        TypeSyntax typeSyntax
-    )
+    private static RequiredBuilderMembersResult CreateRequiredBuilderMembersResult(INamedTypeSymbol interfaceSymbol)
     {
-        return InterfaceValidator.ValidateTargetInterface(interfaceSymbol, typeSyntax)
-            is TargetInterfaceValidationResult.Success validationResult
+        return InterfaceValidator.ValidateTargetInterface(interfaceSymbol)
+            is TargetInterfaceSymbolValidationResult.Success validationResult
                 ? new RequiredBuilderMembersResult(
                     IsValid: true,
                     Members: GetRequiredBuilderMembers(validationResult.Contexts)
@@ -171,9 +167,9 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
     )
     {
         var builder = ImmutableArray.CreateBuilder<RequiredBuilderMember>();
-        var methodKeys = new HashSet<BuilderMemberKey>(BuilderMemberKeyComparer.Instance);
-        var propertyMap = new Dictionary<PropertySignatureKey, PropertyRequirement>(
-            PropertySignatureKeyComparer.Instance
+        var methodSignatures = new HashSet<MethodSignature>(MethodSignatureComparer.Instance);
+        var propertyMap = new Dictionary<PropertySignature, PropertyRequirement>(
+            PropertySignatureComparer.Instance
         );
 
         foreach (var methodSymbol in interfaceContexts.SelectMany(static ctx => ctx.MethodSymbols))
@@ -186,10 +182,12 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var builderMemberKey = CreateMethodBuilderMemberKey(methodSymbol);
+            var methodSignature = MethodSignature.Create(methodSymbol);
 
-            if (methodKeys.Add(builderMemberKey))
+            if (methodSignatures.Add(methodSignature))
             {
+                var builderMemberKey = CreateMethodBuilderMemberKey(methodSignature);
+
                 builder.Add(new RequiredBuilderMember(
                     Key: builderMemberKey,
                     Symbol: methodSymbol,
@@ -200,11 +198,11 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
 
         foreach (var propertySymbol in interfaceContexts.SelectMany(static ctx => ctx.PropertySymbols))
         {
-            var propertySignatureKey = CreatePropertySignatureKey(propertySymbol);
+            var propertySignature = PropertySignature.Create(propertySymbol);
 
-            if (!propertyMap.TryGetValue(propertySignatureKey, out var existing))
+            if (!propertyMap.TryGetValue(propertySignature, out var existing))
             {
-                propertyMap.Add(propertySignatureKey, new PropertyRequirement(
+                propertyMap.Add(propertySignature, new PropertyRequirement(
                     Symbol: propertySymbol,
                     RequiresGetter: propertySymbol.GetMethod != null,
                     RequiresSetter: propertySymbol.SetMethod != null
@@ -213,7 +211,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            propertyMap[propertySignatureKey] = existing with
+            propertyMap[propertySignature] = existing with
             {
                 RequiresGetter = existing.RequiresGetter || propertySymbol.GetMethod != null,
                 RequiresSetter = existing.RequiresSetter || propertySymbol.SetMethod != null,
@@ -287,23 +285,16 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         return parameters.Length > 0 && parameters[0].Type is INamedTypeSymbol { Name: "EventDispatcher" };
     }
 
-    private static BuilderMemberKey CreateMethodBuilderMemberKey(IMethodSymbol methodSymbol)
+    private static BuilderMemberKey CreateMethodBuilderMemberKey(MethodSignature methodSignature)
     {
         return new BuilderMemberKey(
-            ApiName: methodSymbol.Name,
-            DelegateSignatures: ImmutableArray.Create(CreateDelegateSignature(
-                returnType: methodSymbol.ReturnsVoid ? null : methodSymbol.ReturnType,
-                parameters: methodSymbol.Parameters
+            ApiName: methodSignature.Name,
+            DelegateSignatures: ImmutableArray.Create(new DelegateSignatureKey(
+                ReturnType: methodSignature.ReturnType.SpecialType == SpecialType.System_Void
+                    ? null
+                    : methodSignature.ReturnType,
+                ParameterTypes: GetParameterTypes(methodSignature.Parameters)
             ))
-        );
-    }
-
-    private static PropertySignatureKey CreatePropertySignatureKey(IPropertySymbol propertySymbol)
-    {
-        return new PropertySignatureKey(
-            ApiName: propertySymbol.IsIndexer ? "Indexer" : propertySymbol.Name,
-            Type: propertySymbol.Type,
-            ParameterTypes: GetParameterTypes(propertySymbol.Parameters)
         );
     }
 
@@ -502,7 +493,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         if (TargetTypeExtractor.GetCandidateGenericName(invocation) is not { } genericNameSyntax ||
             operation.TargetMethod is not { IsStatic: true, Name: "Of" } methodSymbol ||
             !TargetTypeExtractor.IsImplementationType(methodSymbol.ContainingType) ||
-            genericNameSyntax.TypeArgumentList.Arguments is not [{ } typeArgumentSyntax] ||
+            genericNameSyntax.TypeArgumentList.Arguments is not [_] ||
             methodSymbol.TypeArguments is not [{ } typeArgument] ||
             typeArgument is not INamedTypeSymbol interfaceSymbol
         )
@@ -510,7 +501,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        target = new ImplementationOfTarget(interfaceSymbol, typeArgumentSyntax);
+        target = new ImplementationOfTarget(interfaceSymbol);
 
         return true;
     }
@@ -542,10 +533,7 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private readonly record struct ImplementationOfTarget(
-        INamedTypeSymbol InterfaceSymbol,
-        TypeSyntax TypeSyntax
-    );
+    private readonly record struct ImplementationOfTarget(INamedTypeSymbol InterfaceSymbol);
 
     private readonly record struct BuilderMemberKey(
         string ApiName,
@@ -554,12 +542,6 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
 
     private readonly record struct DelegateSignatureKey(
         ITypeSymbol? ReturnType,
-        ImmutableArray<ITypeSymbol> ParameterTypes
-    );
-
-    private readonly record struct PropertySignatureKey(
-        string ApiName,
-        ITypeSymbol Type,
         ImmutableArray<ITypeSymbol> ParameterTypes
     );
 
@@ -606,7 +588,10 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
                 var rightSignature = right.DelegateSignatures[i];
 
                 if (!SymbolEqualityComparer.Default.Equals(leftSignature.ReturnType, rightSignature.ReturnType) ||
-                    !TypeArraysEqual(leftSignature.ParameterTypes, rightSignature.ParameterTypes)
+                    !InterfaceMemberSignatureHelpers.TypeSymbolsEqual(
+                        leftSignature.ParameterTypes,
+                        rightSignature.ParameterTypes
+                    )
                 )
                 {
                     return false;
@@ -623,70 +608,16 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
 
             foreach (var signature in key.DelegateSignatures)
             {
-                hashCode = AddTypeHashCode(hashCode, signature.ReturnType);
+                hashCode = InterfaceMemberSignatureHelpers.AddTypeHashCode(hashCode, signature.ReturnType);
                 hashCode = unchecked(hashCode * 31 + signature.ParameterTypes.Length);
 
                 foreach (var parameterType in signature.ParameterTypes)
                 {
-                    hashCode = AddTypeHashCode(hashCode, parameterType);
+                    hashCode = InterfaceMemberSignatureHelpers.AddTypeHashCode(hashCode, parameterType);
                 }
             }
 
             return hashCode;
         }
-    }
-
-    private sealed class PropertySignatureKeyComparer : IEqualityComparer<PropertySignatureKey>
-    {
-        public static PropertySignatureKeyComparer Instance { get; } = new();
-
-        public bool Equals(PropertySignatureKey left, PropertySignatureKey right)
-        {
-            return StringComparer.Ordinal.Equals(left.ApiName, right.ApiName) &&
-                   SymbolEqualityComparer.Default.Equals(left.Type, right.Type) &&
-                   TypeArraysEqual(left.ParameterTypes, right.ParameterTypes);
-        }
-
-        public int GetHashCode(PropertySignatureKey key)
-        {
-            var hashCode = StringComparer.Ordinal.GetHashCode(key.ApiName);
-            hashCode = AddTypeHashCode(hashCode, key.Type);
-            hashCode = unchecked(hashCode * 31 + key.ParameterTypes.Length);
-
-            foreach (var parameterType in key.ParameterTypes)
-            {
-                hashCode = AddTypeHashCode(hashCode, parameterType);
-            }
-
-            return hashCode;
-        }
-    }
-
-    private static bool TypeArraysEqual(
-        ImmutableArray<ITypeSymbol> left,
-        ImmutableArray<ITypeSymbol> right
-    )
-    {
-        if (left.Length != right.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Length; i++)
-        {
-            if (!SymbolEqualityComparer.Default.Equals(left[i], right[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static int AddTypeHashCode(int hashCode, ITypeSymbol? typeSymbol)
-    {
-        return unchecked(hashCode * 31 + (typeSymbol is null
-            ? 0
-            : SymbolEqualityComparer.Default.GetHashCode(typeSymbol)));
     }
 }

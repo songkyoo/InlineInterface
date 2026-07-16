@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Macaron.InlineInterface;
@@ -9,37 +8,60 @@ internal static class InterfaceValidator
 {
     public static TargetInterfaceValidationResult ValidateTargetInterface(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
     {
+        var result = ValidateTargetInterface(interfaceSymbol);
+
+        if (result is TargetInterfaceSymbolValidationResult.Success success)
+        {
+            return new TargetInterfaceValidationResult.Success(
+                InterfaceSymbol: success.InterfaceSymbol,
+                Contexts: success.Contexts
+            );
+        }
+
+        var failure = (TargetInterfaceSymbolValidationResult.Failure)result;
+        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>(failure.Issues.Length);
+
+        foreach (var issue in failure.Issues)
+        {
+            diagnosticsBuilder.Add(issue.CreateDiagnostic(typeSyntax));
+        }
+
+        return new TargetInterfaceValidationResult.Failure(diagnosticsBuilder.ToImmutable());
+    }
+
+    public static TargetInterfaceSymbolValidationResult ValidateTargetInterface(INamedTypeSymbol interfaceSymbol)
+    {
         var interfaceContextsBuilder = ImmutableArray.CreateBuilder<InterfaceContext>();
-        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var issuesBuilder = ImmutableArray.CreateBuilder<InterfaceValidationIssue>();
 
         foreach (var symbol in new[] { interfaceSymbol }.Concat(interfaceSymbol.AllInterfaces))
         {
-            var result = ValidateInterfaceMembers(symbol, typeSyntax);
+            var result = ValidateInterfaceMembers(symbol);
 
             if (result.TryGetContext(out var interfaceContext))
             {
                 interfaceContextsBuilder.Add(interfaceContext);
             }
-            else if (result.TryGetDiagnostics(out var diagnostics))
+            else if (result.TryGetIssues(out var issues))
             {
-                diagnosticsBuilder.AddRange(diagnostics);
+                issuesBuilder.AddRange(issues);
             }
         }
 
-        return diagnosticsBuilder.Count > 0
-            ? new TargetInterfaceValidationResult.Failure(Diagnostics: diagnosticsBuilder.ToImmutable())
-            : new TargetInterfaceValidationResult.Success(
+        return issuesBuilder.Count > 0
+            ? new TargetInterfaceSymbolValidationResult.Failure(Issues: issuesBuilder.ToImmutable())
+            : new TargetInterfaceSymbolValidationResult.Success(
                 InterfaceSymbol: interfaceSymbol,
                 Contexts: interfaceContextsBuilder.ToImmutable()
             );
     }
 
-    private static InterfaceMemberValidationResult ValidateInterfaceMembers(INamedTypeSymbol interfaceSymbol, TypeSyntax typeSyntax)
+    private static InterfaceMemberValidationResult ValidateInterfaceMembers(INamedTypeSymbol interfaceSymbol)
     {
         var eventSymbolsBuilder = ImmutableArray.CreateBuilder<IEventSymbol>();
         var propertySymbolsBuilder = ImmutableArray.CreateBuilder<IPropertySymbol>();
         var methodSymbolsBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
-        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var issuesBuilder = ImmutableArray.CreateBuilder<InterfaceValidationIssue>();
 
         foreach (var member in interfaceSymbol.GetMembers())
         {
@@ -60,9 +82,9 @@ internal static class InterfaceValidator
                         })
                     )
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(
-                            typeSyntax,
-                            @event.Name
+                        issuesBuilder.Add(new InterfaceValidationIssue(
+                            Kind: InterfaceValidationIssueKind.NotAllowedEventModifier,
+                            MemberName: @event.Name
                         ));
 
                         break;
@@ -84,9 +106,9 @@ internal static class InterfaceValidator
 
                     if (method.IsGenericMethod)
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(
-                            typeSyntax,
-                            method.Name
+                        issuesBuilder.Add(new InterfaceValidationIssue(
+                            Kind: InterfaceValidationIssueKind.NotAllowedGenericMethod,
+                            MemberName: method.Name
                         ));
 
                         break;
@@ -98,9 +120,9 @@ internal static class InterfaceValidator
                         })
                     )
                     {
-                        diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(
-                            typeSyntax,
-                            method.Name
+                        issuesBuilder.Add(new InterfaceValidationIssue(
+                            Kind: InterfaceValidationIssueKind.NotAllowedMethodModifier,
+                            MemberName: method.Name
                         ));
 
                         break;
@@ -116,10 +138,10 @@ internal static class InterfaceValidator
                 }
                 default:
                 {
-                    diagnosticsBuilder.Add(InlineInterfaceDiagnosticFactory.UnexpectedMemberType(
-                        typeSyntax,
-                        member.Kind,
-                        member.Name
+                    issuesBuilder.Add(new InterfaceValidationIssue(
+                        Kind: InterfaceValidationIssueKind.UnexpectedMemberType,
+                        MemberName: member.Name,
+                        MemberKind: member.Kind
                     ));
 
                     break;
@@ -127,9 +149,9 @@ internal static class InterfaceValidator
             }
         }
 
-        if (diagnosticsBuilder.Count > 0)
+        if (issuesBuilder.Count > 0)
         {
-            return new InterfaceMemberValidationResult(diagnostics: diagnosticsBuilder.ToImmutable());
+            return new InterfaceMemberValidationResult(issues: issuesBuilder.ToImmutable());
         }
 
         return new InterfaceMemberValidationResult(context: new InterfaceContext(

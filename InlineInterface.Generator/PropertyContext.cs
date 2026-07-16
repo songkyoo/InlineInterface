@@ -1,17 +1,8 @@
-﻿using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-
 namespace Macaron.InlineInterface;
 
-internal sealed class PropertyContext(
-    ITypeSymbol typeSymbol,
-    ImmutableArray<IParameterSymbol> parameterSymbols,
-    PropertyGenerationModel model
-)
+internal sealed class PropertyContext(PropertySignature signature, PropertyGenerationModel model)
 {
-    public ITypeSymbol TypeSymbol { get; } = typeSymbol;
-
-    public ImmutableArray<IParameterSymbol> ParameterSymbols { get; } = parameterSymbols;
+    public PropertySignature Signature { get; } = signature;
 
     public PropertyGenerationModel Model { get; set; } = model;
 

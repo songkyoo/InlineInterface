@@ -33,6 +33,7 @@ internal sealed class MethodContextProvider(
         foreach (var methodSymbol in methodSymbols)
         {
             var methodName = methodSymbol.Name;
+            var signature = MethodSignature.Create(methodSymbol);
 
             if (!builder.TryGetValue(methodName, out var contexts))
             {
@@ -44,11 +45,7 @@ internal sealed class MethodContextProvider(
 
             foreach (var existingContext in contexts)
             {
-                if (MatchesMethodSignature(
-                    methodSymbol,
-                    existingContext.ReturnTypeSymbol,
-                    existingContext.ParameterTypeSymbols
-                ))
+                if (MethodSignatureComparer.Instance.Equals(signature, existingContext.Signature))
                 {
                     context = existingContext;
 
@@ -103,8 +100,7 @@ internal sealed class MethodContextProvider(
                 }
 
                 context = new MethodContext(
-                    returnTypeSymbol: methodSymbol.ReturnType,
-                    parameterTypeSymbols: methodSymbol.Parameters,
+                    signature,
                     model: new MethodGenerationModel(
                         ReturnType: returnType,
                         Parameters: string.Join(", ", parameters),
@@ -147,47 +143,6 @@ internal sealed class MethodContextProvider(
         );
     }
 
-    private static bool MatchesMethodSignature(
-        IMethodSymbol methodSymbol,
-        ITypeSymbol returnType,
-        ImmutableArray<IParameterSymbol> parameterTypes
-    )
-    {
-        var comparer = SymbolEqualityComparer.Default;
-
-        if (!comparer.Equals(returnType, methodSymbol.ReturnType))
-        {
-            return false;
-        }
-
-        if (parameterTypes.Length != methodSymbol.Parameters.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < parameterTypes.Length; i++)
-        {
-            var paramSymbol = parameterTypes[i];
-            var targetParamSymbol = methodSymbol.Parameters[i];
-
-            if (!comparer.Equals(paramSymbol.Type, targetParamSymbol.Type))
-            {
-                return false;
-            }
-
-            if (paramSymbol.RefKind != targetParamSymbol.RefKind)
-            {
-                return false;
-            }
-
-            if (paramSymbol.IsParams != targetParamSymbol.IsParams)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
     #endregion
 
     #region Fields

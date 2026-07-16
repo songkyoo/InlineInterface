@@ -33,6 +33,7 @@ internal sealed class PropertyContextProvider(
         foreach (var propertySymbol in propertySymbols)
         {
             var propertyName = propertySymbol.Name;
+            var signature = PropertySignature.Create(propertySymbol);
 
             if (!builder.TryGetValue(propertyName, out var contexts))
             {
@@ -44,12 +45,7 @@ internal sealed class PropertyContextProvider(
 
             for (var i = 0; i < contexts.Count; i++)
             {
-                if (MatchesPropertySignature(
-                    propertySymbol,
-                    contexts[i].Model.Name,
-                    contexts[i].TypeSymbol,
-                    contexts[i].ParameterSymbols
-                ))
+                if (PropertySignatureComparer.Instance.Equals(signature, contexts[i].Signature))
                 {
                     index = i;
 
@@ -63,6 +59,7 @@ internal sealed class PropertyContextProvider(
             {
                 context = CreateContext(
                     propertySymbol,
+                    signature,
                     genericParameterMap,
                     globalTypeBuilder,
                     hasEventMembers,
@@ -76,6 +73,7 @@ internal sealed class PropertyContextProvider(
                 context = contexts[index];
                 var created = CreateContext(
                     propertySymbol,
+                    signature,
                     genericParameterMap,
                     globalTypeBuilder,
                     hasEventMembers,
@@ -125,56 +123,9 @@ internal sealed class PropertyContextProvider(
         );
     }
 
-    private static bool MatchesPropertySignature(
-        IPropertySymbol propertySymbol,
-        string propertyName,
-        ITypeSymbol typeSymbol,
-        ImmutableArray<IParameterSymbol> parameterSymbols
-    )
-    {
-        var comparer = SymbolEqualityComparer.Default;
-
-        if (!propertyName.Equals(propertySymbol.Name))
-        {
-            return false;
-        }
-
-        if (!comparer.Equals(typeSymbol, propertySymbol.Type))
-        {
-            return false;
-        }
-
-        if (parameterSymbols.Length != propertySymbol.Parameters.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < parameterSymbols.Length; i++)
-        {
-            var left = parameterSymbols[i];
-            var right = propertySymbol.Parameters[i];
-
-            if (!comparer.Equals(left.Type, right.Type))
-            {
-                return false;
-            }
-
-            if (left.RefKind != right.RefKind)
-            {
-                return false;
-            }
-
-            if (left.IsParams != right.IsParams)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     private static PropertyContext CreateContext(
         IPropertySymbol propertySymbol,
+        PropertySignature signature,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string globalTypeBuilder,
         bool hasEventMembers,
@@ -257,8 +208,7 @@ internal sealed class PropertyContextProvider(
         }
 
         return new PropertyContext(
-            propertySymbol.Type,
-            propertySymbol.Parameters,
+            signature,
             new PropertyGenerationModel(
                 IsIndexer: isIndexer,
                 Type: propertyType,

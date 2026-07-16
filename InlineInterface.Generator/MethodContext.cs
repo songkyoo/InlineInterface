@@ -1,17 +1,8 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-
 namespace Macaron.InlineInterface;
 
-internal sealed class MethodContext(
-    ITypeSymbol returnTypeSymbol,
-    ImmutableArray<IParameterSymbol> parameterTypeSymbols,
-    MethodGenerationModel model
-)
+internal sealed class MethodContext(MethodSignature signature, MethodGenerationModel model)
 {
-    public ITypeSymbol ReturnTypeSymbol { get; } = returnTypeSymbol;
-
-    public ImmutableArray<IParameterSymbol> ParameterTypeSymbols { get; } = parameterTypeSymbols;
+    public MethodSignature Signature { get; } = signature;
 
     public MethodGenerationModel Model { get; } = model;
 
