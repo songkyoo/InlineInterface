@@ -9,13 +9,6 @@ namespace Macaron.InlineInterface;
 
 internal static class SymbolHelpers
 {
-    public static bool HasDuplicatedTypeParameterName(ImmutableArray<INamedTypeSymbol> typeSymbols)
-    {
-        var seen = new HashSet<string>();
-
-        return typeSymbols.SelectMany(symbol => symbol.TypeParameters).Any(typeParam => !seen.Add(typeParam.Name));
-    }
-
     public static ImmutableArray<INamedTypeSymbol> GetNestedTypeSymbols(INamedTypeSymbol typeSymbol)
     {
         var typeSymbols = new List<INamedTypeSymbol>();
@@ -34,8 +27,7 @@ internal static class SymbolHelpers
 
     public static string GetTypeParameterConstraintClause(
         ITypeParameterSymbol typeParameterSymbol,
-        Func<ITypeParameterSymbol, string> typeParameterNameSelector,
-        Func<ITypeSymbol, string> typeStringSelector
+        ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
     {
         var constraints = new List<string>();
@@ -78,12 +70,12 @@ internal static class SymbolHelpers
 
         if (baseTypeConstraint != null)
         {
-            constraints.Add(typeStringSelector(baseTypeConstraint));
+            constraints.Add(GetTypeString(baseTypeConstraint, genericParameterMap));
         }
 
         foreach (var interfaceConstraint in interfaceConstraints)
         {
-            constraints.Add(typeStringSelector(interfaceConstraint));
+            constraints.Add(GetTypeString(interfaceConstraint, genericParameterMap));
         }
 
         if (typeParameterSymbol.HasConstructorConstraint)
@@ -92,7 +84,7 @@ internal static class SymbolHelpers
         }
 
         return constraints.Count > 0
-            ? $"where {typeParameterNameSelector(typeParameterSymbol)} : {string.Join(", ", constraints)}"
+            ? $"where {genericParameterMap[typeParameterSymbol]} : {string.Join(", ", constraints)}"
             : "";
     }
 
@@ -171,16 +163,29 @@ internal static class SymbolHelpers
     {
         var typeSymbols = GetNestedTypeSymbols(typeSymbol);
         var @namespace = typeSymbol.ContainingNamespace is
-        {
-            IsGlobalNamespace: false
-        } containingNamespace
+            {
+                IsGlobalNamespace: false
+            } containingNamespace
             ? containingNamespace.ToDisplayString()
             : "";
-        var types = new List<string>();
+        var builder = new StringBuilder("global::");
 
-        foreach (var symbol in typeSymbols)
+        if (@namespace.Length > 0)
         {
-            var builder = new StringBuilder(symbol.Name);
+            builder.Append(@namespace);
+            builder.Append(".");
+        }
+
+        for (var typeIndex = 0; typeIndex < typeSymbols.Length; typeIndex++)
+        {
+            if (typeIndex > 0)
+            {
+                builder.Append(".");
+            }
+
+            var symbol = typeSymbols[typeIndex];
+
+            builder.Append(symbol.Name);
 
             if (symbol.Arity > 0)
             {
@@ -198,11 +203,9 @@ internal static class SymbolHelpers
 
                 builder.Append(">");
             }
-
-            types.Add(builder.ToString());
         }
 
-        return $"global::{(@namespace.Length > 0 ? $"{@namespace}." : "")}{string.Join(".", types)}";
+        return builder.ToString();
     }
 
     private static string? GetSpecialTypeKeyword(INamedTypeSymbol typeSymbol)

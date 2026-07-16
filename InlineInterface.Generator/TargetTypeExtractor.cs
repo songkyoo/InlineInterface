@@ -17,7 +17,7 @@ internal static class TargetTypeExtractor
     {
         if (GetCandidateGenericName(generatorSyntaxContext.Node) is not { } genericNameSyntax)
         {
-            return new TargetTypeDiscoveryResult.NotApplicable();
+            return TargetTypeDiscoveryResult.NotApplicable.Instance;
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
@@ -28,18 +28,15 @@ internal static class TargetTypeExtractor
             !IsImplementationType(methodSymbol.ContainingType)
         )
         {
-            return new TargetTypeDiscoveryResult.NotApplicable();
+            return TargetTypeDiscoveryResult.NotApplicable.Instance;
         }
 
         var typeArgumentSyntax = genericNameSyntax.TypeArgumentList.Arguments[0];
 
-        if (ModelExtensions.GetSymbolInfo(semanticModel, typeArgumentSyntax).Symbol is not INamedTypeSymbol
-            {
-                OriginalDefinition: { } typeSymbol,
-            }
+        if (methodSymbol.TypeArguments is not [INamedTypeSymbol { OriginalDefinition: { } typeSymbol }]
         )
         {
-            return new TargetTypeDiscoveryResult.NotApplicable();
+            return TargetTypeDiscoveryResult.NotApplicable.Instance;
         }
 
         if (typeSymbol.TypeKind != TypeKind.Interface)

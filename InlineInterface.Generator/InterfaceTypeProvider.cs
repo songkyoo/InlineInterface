@@ -3,11 +3,17 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InlineInterface;
 
-internal sealed class InterfaceTypeProvider(ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap)
+internal sealed class InterfaceTypeProvider(
+    ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
+    int capacity
+)
 {
     #region Fields
-    private readonly Dictionary<INamedTypeSymbol, int> _cache = new(SymbolEqualityComparer.Default);
-    private readonly List<string> _types = [];
+    private readonly Dictionary<INamedTypeSymbol, int> _cache = new(
+        capacity,
+        SymbolEqualityComparer.Default
+    );
+    private readonly List<string> _types = new(capacity);
     #endregion
 
     #region Methods

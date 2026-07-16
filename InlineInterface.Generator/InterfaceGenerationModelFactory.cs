@@ -19,29 +19,23 @@ internal static class InterfaceGenerationModelFactory
             type,
             genericParameters,
             genericParameterConstraints,
-            genericParameterMap
+            genericParameterMap,
+            mergedTypePrefix
         ) = GetTypeStrings(typeSymbol);
 
-        // get nested types
-        var nestedTypeNames = new List<string> { GetTypeName(typeSymbol) };
-        var containingType = GetContainingType(typeSymbol);
-
-        while (containingType != null)
-        {
-            nestedTypeNames.Add(GetTypeName(containingType));
-            containingType = GetContainingType(containingType);
-        }
-
-        nestedTypeNames.Reverse();
-
-        var mergedTypePrefix = string.Join("_", nestedTypeNames);
         var typeBuilderNamespace = $"Macaron.InlineInterface.Generated{GetNamespaceString(typeSymbol)}";
         var typeBuilder = $"{mergedTypePrefix}Builder{genericParameters}";
         var globalTypeBuilder = $"global::{typeBuilderNamespace}.{typeBuilder}";
 
-        var (eventSymbols, propertySymbols, methodSymbols) = CollectMemberSymbols(interfaceContexts);
-
-        var interfaceTypeProvider = new InterfaceTypeProvider(genericParameterMap);
+        var interfaceTypeProvider = new InterfaceTypeProvider(
+            genericParameterMap,
+            interfaceContexts.Length
+        );
+        var (
+            eventSymbols,
+            propertySymbols,
+            methodSymbols
+        ) = CollectMemberSymbols(interfaceContexts);
 
         var eventContextProvider = new EventContextProvider(
             eventSymbols,
@@ -166,11 +160,6 @@ internal static class InterfaceGenerationModelFactory
         return typeSymbol.ContainingNamespace is { IsGlobalNamespace: false } ns ? $".{ns.ToDisplayString()}" : "";
     }
 
-    private static INamedTypeSymbol? GetContainingType(INamedTypeSymbol typeSymbol)
-    {
-        return typeSymbol.ContainingType?.ConstructedFrom ?? typeSymbol.ContainingType;
-    }
-
     private static string GetTypeName(INamedTypeSymbol typeSymbol)
     {
         return $"{typeSymbol.Name}{(typeSymbol.Arity > 0 ? $"_{typeSymbol.Arity}" : "")}";
@@ -180,68 +169,98 @@ internal static class InterfaceGenerationModelFactory
         string Type,
         string GenericParameters,
         ImmutableArray<string> GenericParameterConstraints,
-        ImmutableDictionary<ITypeParameterSymbol, string> GenericParameterMap
+        ImmutableDictionary<ITypeParameterSymbol, string> GenericParameterMap,
+        string MergedTypePrefix
     ) GetTypeStrings(INamedTypeSymbol typeSymbol)
     {
+        List<ITypeParameterSymbol>? typeParameters = null;
+        HashSet<string>? typeParameterNames = null;
+        var hasDuplicatedTypeParameterName = false;
+        var mergedTypePrefixBuilder = new StringBuilder();
+
         var typeSymbols = GetNestedTypeSymbols(typeSymbol);
-        var typeParameters = typeSymbols
-            .SelectMany(static symbol => symbol.TypeParameters)
-            .ToArray();
 
-        var genericParameterMap = CreateGenericParameterMap(typeSymbols);
+        foreach (var symbol in typeSymbols)
+        {
+            if (mergedTypePrefixBuilder.Length > 0)
+            {
+                mergedTypePrefixBuilder.Append("_");
+            }
 
-        var genericParameterConstraints = typeParameters
-            .Select(symbol => GetTypeParameterConstraintClause(
-                typeParameterSymbol: symbol,
-                typeParameterNameSelector: symbol2 => genericParameterMap[symbol2],
-                typeStringSelector: type => GetTypeString(type, genericParameterMap)
-            ))
-            .Where(static clause => clause.Length > 0)
-            .ToImmutableArray();
+            mergedTypePrefixBuilder.Append(GetTypeName(symbol));
+
+            foreach (var typeParameter in symbol.TypeParameters)
+            {
+                typeParameters ??= [];
+                typeParameterNames ??= new HashSet<string>(StringComparer.Ordinal);
+
+                typeParameters.Add(typeParameter);
+                hasDuplicatedTypeParameterName |= !typeParameterNames.Add(typeParameter.Name);
+            }
+        }
+
+        var genericParameterMapBuilder = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, string>(
+            SymbolEqualityComparer.Default
+        );
+
+        if (typeParameters is not null)
+        {
+            for (var i = 0; i < typeParameters.Count; i++)
+            {
+                var typeParameter = typeParameters[i];
+
+                genericParameterMapBuilder.Add(
+                    typeParameter,
+                    hasDuplicatedTypeParameterName ? $"T{i}" : typeParameter.Name
+                );
+            }
+        }
+
+        var genericParameterMap = genericParameterMapBuilder.ToImmutable();
+        var genericParameters = "";
+        var genericParameterConstraints = ImmutableArray<string>.Empty;
+
+        if (typeParameters is not null)
+        {
+            var genericParameterConstraintsBuilder = ImmutableArray.CreateBuilder<string>(typeParameters.Count);
+            var genericParametersBuilder = new StringBuilder("<");
+
+            for (var i = 0; i < typeParameters.Count; i++)
+            {
+                var typeParameter = typeParameters[i];
+
+                if (i > 0)
+                {
+                    genericParametersBuilder.Append(", ");
+                }
+
+                genericParametersBuilder.Append(genericParameterMap[typeParameter]);
+
+                var constraint = GetTypeParameterConstraintClause(
+                    typeParameter,
+                    genericParameterMap
+                );
+
+                if (constraint.Length > 0)
+                {
+                    genericParameterConstraintsBuilder.Add(constraint);
+                }
+            }
+
+            genericParametersBuilder.Append(">");
+            genericParameters = genericParametersBuilder.ToString();
+            genericParameterConstraints = genericParameterConstraintsBuilder.ToImmutable();
+        }
 
         var type = GetTypeString(typeSymbol, genericParameterMap);
-
-        var genericParameters = typeParameters.Length > 0
-            ? $"<{string.Join(", ", typeParameters.Select(symbol => genericParameterMap[symbol]))}>"
-            : "";
 
         return (
             Type: type,
             GenericParameters: genericParameters,
             GenericParameterConstraints: genericParameterConstraints,
-            GenericParameterMap: genericParameterMap
+            GenericParameterMap: genericParameterMap,
+            MergedTypePrefix: mergedTypePrefixBuilder.ToString()
         );
-
-        #region Local Functions
-        static ImmutableDictionary<ITypeParameterSymbol, string> CreateGenericParameterMap(
-            ImmutableArray<INamedTypeSymbol> typeSymbols
-        )
-        {
-            var builder = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, string>(
-                SymbolEqualityComparer.Default
-            );
-
-            if (!HasDuplicatedTypeParameterName(typeSymbols))
-            {
-                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
-                {
-                    builder.Add(typeParameter, typeParameter.Name);
-                }
-            }
-            else
-            {
-                var index = 0;
-
-                foreach (var typeParameter in typeSymbols.SelectMany(static symbol => symbol.TypeParameters))
-                {
-                    builder.Add(typeParameter, $"T{index}");
-                    index += 1;
-                }
-            }
-
-            return builder.ToImmutable();
-        }
-        #endregion
     }
 
     private static string GetHintName(INamedTypeSymbol typeSymbol)

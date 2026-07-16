@@ -16,5 +16,10 @@ internal abstract record TargetTypeDiscoveryResult
         Diagnostic Diagnostic
     ) : TargetTypeDiscoveryResult;
 
-    public sealed record NotApplicable : TargetTypeDiscoveryResult;
+    public sealed record NotApplicable : TargetTypeDiscoveryResult
+    {
+        private NotApplicable() { }
+
+        public static NotApplicable Instance { get; } = new();
+    }
 }

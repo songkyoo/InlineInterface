@@ -6,13 +6,13 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 namespace Macaron.InlineInterface;
 
 internal sealed class MethodContextProvider(
-    IEnumerable<IMethodSymbol> methodSymbols,
+    ImmutableArray<IMethodSymbol> methodSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,
     bool hasEventMembers
 )
 {
-    #region Nested Types
+    #region Types
     private sealed record ProviderCache(
         ImmutableArray<MethodGenerationModel> Models,
         ImmutableArray<int> GenerationModelIndicesByImplementation
@@ -21,14 +21,14 @@ internal sealed class MethodContextProvider(
 
     #region Static Methods
     private static ProviderCache CreateCache(
-        IEnumerable<IMethodSymbol> methodSymbols,
+        ImmutableArray<IMethodSymbol> methodSymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string globalTypeBuilder,
         bool hasEventMembers
     )
     {
         var builder = new SortedDictionary<string, List<MethodContext>>();
-        var implementationContexts = new List<MethodContext>();
+        var implementationContexts = new List<MethodContext>(capacity: methodSymbols.Length);
 
         foreach (var methodSymbol in methodSymbols)
         {
@@ -62,9 +62,10 @@ internal sealed class MethodContextProvider(
                 var parameterName = $"method_{methodName}_{contexts.Count}";
                 var fieldName = $"_{parameterName}";
 
-                var paramTypes = new List<string>();
-                var parameters = new List<string>();
-                var arguments = new List<string>();
+                var eventParameterCount = hasEventMembers ? 1 : 0;
+                var paramTypes = new List<string>(capacity: methodSymbol.Parameters.Length + eventParameterCount);
+                var parameters = new List<string>(capacity: methodSymbol.Parameters.Length);
+                var arguments = new List<string>(capacity: methodSymbol.Parameters.Length + eventParameterCount);
 
                 if (hasEventMembers)
                 {
@@ -102,9 +103,9 @@ internal sealed class MethodContextProvider(
                 }
 
                 context = new MethodContext(
-                    methodSymbol.ReturnType,
-                    methodSymbol.Parameters,
-                    new MethodGenerationModel(
+                    returnTypeSymbol: methodSymbol.ReturnType,
+                    parameterTypeSymbols: methodSymbol.Parameters,
+                    model: new MethodGenerationModel(
                         ReturnType: returnType,
                         Parameters: string.Join(", ", parameters),
                         Arguments: string.Join(", ", arguments),
@@ -122,7 +123,7 @@ internal sealed class MethodContextProvider(
             implementationContexts.Add(context);
         }
 
-        var modelBuilder = ImmutableArray.CreateBuilder<MethodGenerationModel>();
+        var modelBuilder = ImmutableArray.CreateBuilder<MethodGenerationModel>(initialCapacity: methodSymbols.Length);
 
         foreach (var pair in builder)
         {
@@ -133,7 +134,7 @@ internal sealed class MethodContextProvider(
             }
         }
 
-        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(initialCapacity: implementationContexts.Count);
 
         foreach (var context in implementationContexts)
         {
@@ -200,7 +201,7 @@ internal sealed class MethodContextProvider(
 
     #region Properties
     public ImmutableArray<MethodGenerationModel> Models => _cache.Models;
-    public ImmutableArray<int> GenerationModelIndicesByImplementation =>
-        _cache.GenerationModelIndicesByImplementation;
+
+    public ImmutableArray<int> GenerationModelIndicesByImplementation => _cache.GenerationModelIndicesByImplementation;
     #endregion
 }

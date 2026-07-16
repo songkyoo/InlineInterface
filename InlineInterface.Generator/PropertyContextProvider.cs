@@ -6,13 +6,13 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 namespace Macaron.InlineInterface;
 
 internal sealed class PropertyContextProvider(
-    IEnumerable<IPropertySymbol> propertySymbols,
+    ImmutableArray<IPropertySymbol> propertySymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
     string globalTypeBuilder,
     bool hasEventMembers
 )
 {
-    #region Nested Types
+    #region Types
     private sealed record ProviderCache(
         ImmutableArray<PropertyGenerationModel> Models,
         ImmutableArray<int> GenerationModelIndicesByImplementation
@@ -21,14 +21,14 @@ internal sealed class PropertyContextProvider(
 
     #region Static Methods
     private static ProviderCache CreateCache(
-        IEnumerable<IPropertySymbol> propertySymbols,
+        ImmutableArray<IPropertySymbol> propertySymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap,
         string globalTypeBuilder,
         bool hasEventMembers
     )
     {
         var builder = new SortedDictionary<string, List<PropertyContext>>();
-        var implementationContexts = new List<PropertyContext>();
+        var implementationContexts = new List<PropertyContext>(capacity: propertySymbols.Length);
 
         foreach (var propertySymbol in propertySymbols)
         {
@@ -101,7 +101,7 @@ internal sealed class PropertyContextProvider(
             implementationContexts.Add(context);
         }
 
-        var modelBuilder = ImmutableArray.CreateBuilder<PropertyGenerationModel>();
+        var modelBuilder = ImmutableArray.CreateBuilder<PropertyGenerationModel>(initialCapacity: propertySymbols.Length);
 
         foreach (var pair in builder)
         {
@@ -112,7 +112,7 @@ internal sealed class PropertyContextProvider(
             }
         }
 
-        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(initialCapacity: implementationContexts.Count);
 
         foreach (var context in implementationContexts)
         {
@@ -187,9 +187,12 @@ internal sealed class PropertyContextProvider(
         var apiName = isIndexer ? "Indexer" : propertySymbol.Name;
         var uniqueName = isIndexer ? $"Indexer_{uniqueIndex}" : $"{propertySymbol.Name}_{uniqueIndex}";
 
-        var parameters = new List<string>();
-        var arguments = new List<string>();
-        var delegateParameterTypes = new List<string>();
+        var eventParameterCount = hasEventMembers ? 1 : 0;
+        var parameters = new List<string>(propertySymbol.Parameters.Length);
+        var arguments = new List<string>(propertySymbol.Parameters.Length + eventParameterCount);
+        var delegateParameterTypes = new List<string>(
+            propertySymbol.Parameters.Length + eventParameterCount + 1
+        );
 
         if (hasEventMembers)
         {
@@ -242,11 +245,8 @@ internal sealed class PropertyContextProvider(
             setterParameterName = $"property_set_{uniqueName}";
             setterFieldName = $"_{setterParameterName}";
 
-            var setterDelegateParameterTypes = delegateParameterTypes
-                .Concat([propertyType])
-                .ToArray();
-
-            setterDelegateType = $"global::System.Action<{string.Join(", ", setterDelegateParameterTypes)}>";
+            delegateParameterTypes.Add(propertyType);
+            setterDelegateType = $"global::System.Action<{string.Join(", ", delegateParameterTypes)}>";
         }
         else
         {

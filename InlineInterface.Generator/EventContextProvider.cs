@@ -6,11 +6,11 @@ using static Macaron.InlineInterface.ParameterStringHelpers;
 namespace Macaron.InlineInterface;
 
 internal sealed class EventContextProvider(
-    IEnumerable<IEventSymbol> eventSymbols,
+    ImmutableArray<IEventSymbol> eventSymbols,
     ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
 )
 {
-    #region Nested Types
+    #region Types
     private sealed record ProviderCache(
         ImmutableArray<EventGenerationModel> Models,
         ImmutableArray<int> GenerationModelIndicesByImplementation
@@ -19,12 +19,12 @@ internal sealed class EventContextProvider(
 
     #region Static Methods
     private static ProviderCache CreateCache(
-        IEnumerable<IEventSymbol> eventSymbols,
+        ImmutableArray<IEventSymbol> eventSymbols,
         ImmutableDictionary<ITypeParameterSymbol, string> genericParameterMap
     )
     {
         var builder = new SortedDictionary<string, List<EventContext>>();
-        var implementationContexts = new List<EventContext?>();
+        var implementationContexts = new List<EventContext?>(capacity: eventSymbols.Length);
 
         foreach (var eventSymbol in eventSymbols)
         {
@@ -74,7 +74,7 @@ internal sealed class EventContextProvider(
                 var uniqueName = $"{eventName}_{contexts.Count}";
                 context = new EventContext(
                     typeSymbol,
-                    CreateGenerationModel(
+                    model: CreateGenerationModel(
                         typeSymbol,
                         type,
                         eventName,
@@ -89,7 +89,7 @@ internal sealed class EventContextProvider(
             implementationContexts.Add(context);
         }
 
-        var modelBuilder = ImmutableArray.CreateBuilder<EventGenerationModel>();
+        var modelBuilder = ImmutableArray.CreateBuilder<EventGenerationModel>(initialCapacity: eventSymbols.Length);
 
         foreach (var pair in builder)
         {
@@ -100,7 +100,7 @@ internal sealed class EventContextProvider(
             }
         }
 
-        var indexBuilder = ImmutableArray.CreateBuilder<int>(implementationContexts.Count);
+        var indexBuilder = ImmutableArray.CreateBuilder<int>(initialCapacity: implementationContexts.Count);
 
         foreach (var context in implementationContexts)
         {
@@ -122,8 +122,10 @@ internal sealed class EventContextProvider(
     )
     {
         var methodSymbol = typeSymbol.DelegateInvokeMethod!;
-        var parameters = new List<string>();
-        var arguments = new List<string>();
+        var parameters = new List<string>(
+            capacity: methodSymbol.Parameters.Length + (methodSymbol.ReturnsVoid ? 0 : 1)
+        );
+        var arguments = new List<string>(methodSymbol.Parameters.Length);
 
         foreach (var parameterSymbol in methodSymbol.Parameters)
         {
