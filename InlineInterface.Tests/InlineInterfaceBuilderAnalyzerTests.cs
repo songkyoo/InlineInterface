@@ -202,4 +202,151 @@ public partial class InlineInterfaceGeneratorTests
             diagnosticId: "MII0009"
         );
     }
+
+    [Test]
+    public void ReportsDiagnosticsForRepeatedBuilderChainsOfSameInterface()
+    {
+        var diagnostics = AnalyzeAndGetDiagnostics<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                void Write(string value);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>().Build();
+                    _ = Implementation.Of<IBuffer>().Build();
+                }
+            }
+            """
+        ).Where(diagnostic => diagnostic.Id == "MII0009").ToArray();
+
+        Assert.That(diagnostics, Has.Length.EqualTo(2));
+    }
+
+    [Test]
+    public void CachesRequiredMembersSeparatelyForConstructedInterfaces()
+    {
+        var diagnostics = AnalyzeAndGetDiagnostics<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer<T>
+            {
+                void Write(T value);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer<int>>().Build();
+                    _ = Implementation.Of<IBuffer<string>>().Build();
+                }
+            }
+            """
+        ).Where(diagnostic => diagnostic.Id == "MII0009").ToArray();
+
+        Assert.That(diagnostics, Has.Length.EqualTo(2));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
+            Has.Some.Contains("Write(int value)")
+        );
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
+            Has.Some.Contains("Write(string value)")
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForConfiguredMethodOverloads()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                void Write(int value);
+                void Write(string value);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Write((int value) => { })
+                        .Write((string value) => { })
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersWhenDelegateIncludesEventDispatcher()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using System;
+            using Macaron.InlineInterface;
+
+            public interface IBuffer
+            {
+                event EventHandler Changed;
+                string Read();
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer>()
+                        .Read(_ => "")
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
+
+    [Test]
+    public void DoesNotReportMissingMembersForConfiguredConstructedInterface()
+    {
+        AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBuffer<T>
+            {
+                void Write(T value);
+            }
+
+            public class Test
+            {
+                public void M()
+                {
+                    _ = Implementation.Of<IBuffer<int>>()
+                        .Write(value => { })
+                        .Build();
+                }
+            }
+            """,
+            diagnosticId: "MII0009"
+        );
+    }
 }

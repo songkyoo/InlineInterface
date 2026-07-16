@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,19 +13,35 @@ namespace Macaron.InlineInterface;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
 {
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(
+    private static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnosticsValue = ImmutableArray.Create(
         InlineInterfaceDiagnostics.BuilderMustBeCompletedInSameExpressionRule,
         InlineInterfaceDiagnostics.MissingRequiredBuilderMembersRule
     );
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedDiagnosticsValue;
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
+        context.RegisterCompilationStartAction(static compilationStartContext =>
+        {
+            var requiredMembersCache = new ConcurrentDictionary<
+                INamedTypeSymbol,
+                Lazy<RequiredBuilderMembersResult>
+            >(SymbolEqualityComparer.Default);
+
+            compilationStartContext.RegisterSyntaxNodeAction(
+                context => AnalyzeInvocation(context, requiredMembersCache),
+                SyntaxKind.InvocationExpression
+            );
+        });
     }
 
-    private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeInvocation(
+        SyntaxNodeAnalysisContext context,
+        ConcurrentDictionary<INamedTypeSymbol, Lazy<RequiredBuilderMembersResult>> requiredMembersCache
+    )
     {
         if (context.Node is not InvocationExpressionSyntax invocation ||
             !TargetTypeExtractor.IsCandidate(invocation) ||
@@ -35,9 +52,11 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var outermostExpression = GetOutermostChainExpression(invocation);
-
-        if (!TryCollectInvocationChain(outermostExpression, out var chainInvocations))
+        if (!TryCollectInvocationChain(
+            invocation,
+            out var chainInvocations,
+            out var outermostExpression
+        ))
         {
             return;
         }
@@ -54,6 +73,13 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (!TryCollectInvocationOperationChain(operation, chainInvocations, out var chainOperations) ||
+            !IsBuildInvocation(chainOperations[^1], target.InterfaceSymbol)
+        )
+        {
+            return;
+        }
+
         var allowMissingImplementation = GetAllowMissingImplementation(operation);
 
         if (allowMissingImplementation is not false)
@@ -61,30 +87,37 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (InterfaceValidator.ValidateTargetInterface(target.InterfaceSymbol, target.TypeSyntax)
-            is not TargetInterfaceValidationResult.Success validationResult
-        )
+        var requiredMembersResult = GetRequiredBuilderMembersResult(requiredMembersCache, target);
+
+        if (!requiredMembersResult.IsValid)
         {
             return;
         }
 
-        var configuredMemberKeys = chainInvocations
-            .Skip(1)
-            .Take(chainInvocations.Length - 2)
-            .Select(builderInvocation => GetBuilderMemberKey(
-                context.SemanticModel,
-                builderInvocation,
-                context.CancellationToken
-            ))
-            .Where(static key => key is not null)
-            .ToImmutableHashSet(StringComparer.Ordinal);
+        var configuredMemberKeys = new HashSet<BuilderMemberKey>(BuilderMemberKeyComparer.Instance);
 
-        var missingMembers = GetRequiredBuilderMembers(validationResult.Contexts)
-            .Where(member => !configuredMemberKeys.Contains(member.Key))
-            .Select(member => member.Description)
-            .ToImmutableArray();
+        for (var i = 1; i < chainInvocations.Length - 1; i++)
+        {
+            if (GetBuilderMemberKey(chainOperations[i].TargetMethod) is { } key)
+            {
+                configuredMemberKeys.Add(key);
+            }
+        }
 
-        if (missingMembers.Length == 0)
+        ImmutableArray<string>.Builder? missingMembersBuilder = null;
+
+        foreach (var member in requiredMembersResult.Members)
+        {
+            if (configuredMemberKeys.Contains(member.Key))
+            {
+                continue;
+            }
+
+            missingMembersBuilder ??= ImmutableArray.CreateBuilder<string>();
+            missingMembersBuilder.Add(CreateRequiredBuilderMemberDescription(member));
+        }
+
+        if (missingMembersBuilder is null)
         {
             return;
         }
@@ -94,17 +127,54 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             location: lastInvocation.GetLocation(),
             messageArgs: [
                 target.InterfaceSymbol.ToDisplayString(MinimallyQualifiedFormat),
-                string.Join(", ", missingMembers),
+                string.Join(", ", missingMembersBuilder),
             ]
         ));
+    }
+
+    private static RequiredBuilderMembersResult GetRequiredBuilderMembersResult(
+        ConcurrentDictionary<INamedTypeSymbol, Lazy<RequiredBuilderMembersResult>> requiredMembersCache,
+        ImplementationOfTarget target
+    )
+    {
+        var typeSyntax = target.TypeSyntax;
+        var lazyResult = requiredMembersCache.GetOrAdd(
+            target.InterfaceSymbol,
+            interfaceSymbol => new Lazy<RequiredBuilderMembersResult>(
+                () => CreateRequiredBuilderMembersResult(interfaceSymbol, typeSyntax),
+                LazyThreadSafetyMode.ExecutionAndPublication
+            )
+        );
+
+        return lazyResult.Value;
+    }
+
+    private static RequiredBuilderMembersResult CreateRequiredBuilderMembersResult(
+        INamedTypeSymbol interfaceSymbol,
+        TypeSyntax typeSyntax
+    )
+    {
+        return InterfaceValidator.ValidateTargetInterface(interfaceSymbol, typeSyntax)
+            is TargetInterfaceValidationResult.Success validationResult
+                ? new RequiredBuilderMembersResult(
+                    IsValid: true,
+                    Members: GetRequiredBuilderMembers(validationResult.Contexts)
+                )
+                : new RequiredBuilderMembersResult(
+                    IsValid: false,
+                    Members: ImmutableArray<RequiredBuilderMember>.Empty
+                );
     }
 
     private static ImmutableArray<RequiredBuilderMember> GetRequiredBuilderMembers(
         ImmutableArray<InterfaceContext> interfaceContexts
     )
     {
-        var methodMap = new Dictionary<string, RequiredBuilderMember>(StringComparer.Ordinal);
-        var propertyMap = new Dictionary<string, PropertyRequirement>(StringComparer.Ordinal);
+        var builder = ImmutableArray.CreateBuilder<RequiredBuilderMember>();
+        var methodKeys = new HashSet<BuilderMemberKey>(BuilderMemberKeyComparer.Instance);
+        var propertyMap = new Dictionary<PropertySignatureKey, PropertyRequirement>(
+            PropertySignatureKeyComparer.Instance
+        );
 
         foreach (var methodSymbol in interfaceContexts.SelectMany(static ctx => ctx.MethodSymbols))
         {
@@ -116,19 +186,14 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var signatureKey = CreateMethodSignatureKey(methodSymbol);
+            var builderMemberKey = CreateMethodBuilderMemberKey(methodSymbol);
 
-            if (!methodMap.ContainsKey(signatureKey))
+            if (methodKeys.Add(builderMemberKey))
             {
-                methodMap.Add(signatureKey, new RequiredBuilderMember(
-                    Key: CreateBuilderMemberKey(
-                        apiName: methodSymbol.Name,
-                        delegateSignatures: ImmutableArray.Create(CreateDelegateSignature(
-                            returnType: methodSymbol.ReturnType,
-                            parameterTypes: methodSymbol.Parameters.Select(static parameter => parameter.Type)
-                        ))
-                    ),
-                    Description: $"method '{CreateMethodDisplay(methodSymbol)}'"
+                builder.Add(new RequiredBuilderMember(
+                    Key: builderMemberKey,
+                    Symbol: methodSymbol,
+                    Kind: RequiredBuilderMemberKind.Method
                 ));
             }
         }
@@ -155,19 +220,15 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             };
         }
 
-        var builder = ImmutableArray.CreateBuilder<RequiredBuilderMember>(methodMap.Count + propertyMap.Count);
-
-        builder.AddRange(methodMap.Values);
-
         foreach (var requirement in propertyMap.Values)
         {
-            var delegateSignatures = ImmutableArray.CreateBuilder<string>();
+            var delegateSignatures = ImmutableArray.CreateBuilder<DelegateSignatureKey>();
 
             if (requirement.RequiresGetter)
             {
                 delegateSignatures.Add(CreateDelegateSignature(
                     returnType: requirement.Symbol.Type,
-                    parameterTypes: requirement.Symbol.Parameters.Select(static parameter => parameter.Type)
+                    parameters: requirement.Symbol.Parameters
                 ));
             }
 
@@ -175,96 +236,126 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             {
                 delegateSignatures.Add(CreateDelegateSignature(
                     returnType: null,
-                    parameterTypes: requirement.Symbol.Parameters
-                        .Select(static parameter => parameter.Type)
-                        .Concat([requirement.Symbol.Type])
+                    parameters: requirement.Symbol.Parameters,
+                    trailingParameterType: requirement.Symbol.Type
                 ));
             }
 
             builder.Add(new RequiredBuilderMember(
-                Key: CreateBuilderMemberKey(
-                    apiName: requirement.Symbol.IsIndexer ? "Indexer" : requirement.Symbol.Name,
-                    delegateSignatures: delegateSignatures.ToImmutable()
+                Key: new BuilderMemberKey(
+                    ApiName: requirement.Symbol.IsIndexer ? "Indexer" : requirement.Symbol.Name,
+                    DelegateSignatures: delegateSignatures.ToImmutable()
                 ),
-                Description: requirement.Symbol.IsIndexer
-                    ? $"indexer '{CreateIndexerDisplay(requirement.Symbol)}'"
-                    : $"property '{requirement.Symbol.Name}'"
+                Symbol: requirement.Symbol,
+                Kind: requirement.Symbol.IsIndexer
+                    ? RequiredBuilderMemberKind.Indexer
+                    : RequiredBuilderMemberKind.Property
             ));
         }
 
         return builder.ToImmutable();
     }
 
-    private static string? GetBuilderMemberKey(
-        SemanticModel semanticModel,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken
-    )
+    private static BuilderMemberKey? GetBuilderMemberKey(IMethodSymbol methodSymbol)
     {
-        if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol methodSymbol)
-        {
-            return null;
-        }
+        var delegateSignatures = ImmutableArray.CreateBuilder<DelegateSignatureKey>();
+        var parameterOffset = methodSymbol.IsExtensionMethod && methodSymbol.ReducedFrom is null ? 1 : 0;
 
-        var delegateSignatures = ImmutableArray.CreateBuilder<string>();
-
-        foreach (var parameterSymbol in methodSymbol.Parameters)
+        for (var i = parameterOffset; i < methodSymbol.Parameters.Length; i++)
         {
+            var parameterSymbol = methodSymbol.Parameters[i];
+
             if (parameterSymbol.Type is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
             {
                 return null;
             }
 
+            var delegateParameterOffset = HasEventDispatcherParameter(invokeMethod.Parameters) ? 1 : 0;
+
             delegateSignatures.Add(CreateDelegateSignature(
                 returnType: invokeMethod.ReturnsVoid ? null : invokeMethod.ReturnType,
-                parameterTypes: TrimEventDispatcherParameter(invokeMethod.Parameters)
-                    .Select(static parameter => parameter.Type)
+                parameters: invokeMethod.Parameters,
+                parameterOffset: delegateParameterOffset
             ));
         }
 
-        return CreateBuilderMemberKey(methodSymbol.Name, delegateSignatures.ToImmutable());
+        return new BuilderMemberKey(methodSymbol.Name, delegateSignatures.ToImmutable());
     }
 
-    private static ImmutableArray<IParameterSymbol> TrimEventDispatcherParameter(ImmutableArray<IParameterSymbol> parameters)
+    private static bool HasEventDispatcherParameter(ImmutableArray<IParameterSymbol> parameters)
     {
-        if (parameters.Length == 0 || parameters[0].Type is not INamedTypeSymbol { Name: "EventDispatcher" })
+        return parameters.Length > 0 && parameters[0].Type is INamedTypeSymbol { Name: "EventDispatcher" };
+    }
+
+    private static BuilderMemberKey CreateMethodBuilderMemberKey(IMethodSymbol methodSymbol)
+    {
+        return new BuilderMemberKey(
+            ApiName: methodSymbol.Name,
+            DelegateSignatures: ImmutableArray.Create(CreateDelegateSignature(
+                returnType: methodSymbol.ReturnsVoid ? null : methodSymbol.ReturnType,
+                parameters: methodSymbol.Parameters
+            ))
+        );
+    }
+
+    private static PropertySignatureKey CreatePropertySignatureKey(IPropertySymbol propertySymbol)
+    {
+        return new PropertySignatureKey(
+            ApiName: propertySymbol.IsIndexer ? "Indexer" : propertySymbol.Name,
+            Type: propertySymbol.Type,
+            ParameterTypes: GetParameterTypes(propertySymbol.Parameters)
+        );
+    }
+
+    private static DelegateSignatureKey CreateDelegateSignature(
+        ITypeSymbol? returnType,
+        ImmutableArray<IParameterSymbol> parameters,
+        int parameterOffset = 0,
+        ITypeSymbol? trailingParameterType = null
+    )
+    {
+        return new DelegateSignatureKey(
+            ReturnType: returnType,
+            ParameterTypes: GetParameterTypes(parameters, parameterOffset, trailingParameterType)
+        );
+    }
+
+    private static ImmutableArray<ITypeSymbol> GetParameterTypes(
+        ImmutableArray<IParameterSymbol> parameters,
+        int parameterOffset = 0,
+        ITypeSymbol? trailingParameterType = null
+    )
+    {
+        var trailingParameterCount = trailingParameterType is null ? 0 : 1;
+        var builder = ImmutableArray.CreateBuilder<ITypeSymbol>(
+            parameters.Length - parameterOffset + trailingParameterCount
+        );
+
+        for (var i = parameterOffset; i < parameters.Length; i++)
         {
-            return parameters;
+            builder.Add(parameters[i].Type);
         }
 
-        return parameters.RemoveAt(0);
+        if (trailingParameterType is not null)
+        {
+            builder.Add(trailingParameterType);
+        }
+
+        return builder.ToImmutable();
     }
 
-    private static string CreateBuilderMemberKey(string apiName, ImmutableArray<string> delegateSignatures)
+    private static string CreateRequiredBuilderMemberDescription(RequiredBuilderMember member)
     {
-        return $"{apiName}|{string.Join("|", delegateSignatures)}";
-    }
-
-    private static string CreateMethodSignatureKey(IMethodSymbol methodSymbol)
-    {
-        return $"{methodSymbol.Name}|{CreateTypeKey(methodSymbol.ReturnType)}|{string.Join("|", methodSymbol.Parameters.Select(static parameter => CreateTypeKey(parameter.Type)))}";
-    }
-
-    private static string CreatePropertySignatureKey(IPropertySymbol propertySymbol)
-    {
-        var apiName = propertySymbol.IsIndexer ? "Indexer" : propertySymbol.Name;
-        var typeKey = CreateTypeKey(propertySymbol.Type);
-        var parameterKeys = string.Join("|", propertySymbol.Parameters.Select(static parameter => CreateTypeKey(parameter.Type)));
-
-        return $"{apiName}|{typeKey}|{parameterKeys}";
-    }
-
-    private static string CreateDelegateSignature(ITypeSymbol? returnType, IEnumerable<ITypeSymbol> parameterTypes)
-    {
-        var parameterKeys = string.Join(", ", parameterTypes.Select(CreateTypeKey));
-        var returnKey = returnType is null ? "void" : CreateTypeKey(returnType);
-
-        return $"({parameterKeys})->{returnKey}";
-    }
-
-    private static string CreateTypeKey(ITypeSymbol typeSymbol)
-    {
-        return typeSymbol.ToDisplayString(FullyQualifiedFormat);
+        return member switch
+        {
+            { Kind: RequiredBuilderMemberKind.Method, Symbol: IMethodSymbol methodSymbol } =>
+                $"method '{CreateMethodDisplay(methodSymbol)}'",
+            { Kind: RequiredBuilderMemberKind.Indexer, Symbol: IPropertySymbol propertySymbol } =>
+                $"indexer '{CreateIndexerDisplay(propertySymbol)}'",
+            { Kind: RequiredBuilderMemberKind.Property, Symbol: IPropertySymbol propertySymbol } =>
+                $"property '{propertySymbol.Name}'",
+            _ => throw new InvalidOperationException("Unexpected required builder member."),
+        };
     }
 
     private static string CreateMethodDisplay(IMethodSymbol methodSymbol)
@@ -290,9 +381,25 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         return GetInvokedMethodName(invocation) == "Build";
     }
 
-    private static ExpressionSyntax GetOutermostChainExpression(InvocationExpressionSyntax invocation)
+    private static bool IsBuildInvocation(
+        IInvocationOperation invocation,
+        INamedTypeSymbol targetInterfaceSymbol
+    )
     {
-        ExpressionSyntax current = invocation;
+        return invocation.TargetMethod.Name == "Build" &&
+               SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ReturnType, targetInterfaceSymbol);
+    }
+
+    private static bool TryCollectInvocationChain(
+        InvocationExpressionSyntax invocation,
+        out ImmutableArray<InvocationExpressionSyntax> invocations,
+        out ExpressionSyntax outermostExpression
+    )
+    {
+        var builder = ImmutableArray.CreateBuilder<InvocationExpressionSyntax>();
+        builder.Add(invocation);
+
+        var current = invocation;
 
         while (true)
         {
@@ -300,71 +407,88 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
             {
                 case MemberAccessExpressionSyntax memberAccess when memberAccess.Expression == current:
                 {
-                    current = memberAccess;
+                    if (memberAccess.Parent is not InvocationExpressionSyntax parentInvocation ||
+                        parentInvocation.Expression != memberAccess
+                    )
+                    {
+                        invocations = ImmutableArray<InvocationExpressionSyntax>.Empty;
+                        outermostExpression = memberAccess;
+
+                        return false;
+                    }
+
+                    builder.Add(parentInvocation);
+                    current = parentInvocation;
 
                     continue;
                 }
                 case InvocationExpressionSyntax parentInvocation when parentInvocation.Expression == current:
                 {
-                    current = parentInvocation;
+                    invocations = ImmutableArray<InvocationExpressionSyntax>.Empty;
+                    outermostExpression = parentInvocation;
 
-                    continue;
+                    return false;
                 }
                 default:
-                    return current;
+                {
+                    invocations = builder.ToImmutable();
+                    outermostExpression = current;
+
+                    return true;
+                }
             }
         }
     }
 
-    private static bool TryCollectInvocationChain(
-        ExpressionSyntax expression,
-        out ImmutableArray<InvocationExpressionSyntax> invocations
+    private static bool TryCollectInvocationOperationChain(
+        IInvocationOperation operation,
+        ImmutableArray<InvocationExpressionSyntax> invocationSyntaxes,
+        out ImmutableArray<IInvocationOperation> invocations
     )
     {
-        var builder = ImmutableArray.CreateBuilder<InvocationExpressionSyntax>();
-        var success = TryCollectInvocationChainCore(expression, builder);
-
-        invocations = success ? builder.ToImmutable() : ImmutableArray<InvocationExpressionSyntax>.Empty;
-
-        return success;
-    }
-
-    private static bool TryCollectInvocationChainCore(
-        ExpressionSyntax expression,
-        ImmutableArray<InvocationExpressionSyntax>.Builder builder
-    )
-    {
-        if (expression is not InvocationExpressionSyntax invocation)
+        if (invocationSyntaxes.Length == 0 || !HasSameSyntax(operation, invocationSyntaxes[0]))
         {
+            invocations = ImmutableArray<IInvocationOperation>.Empty;
+
             return false;
         }
 
-        switch (invocation.Expression)
+        var builder = ImmutableArray.CreateBuilder<IInvocationOperation>(invocationSyntaxes.Length);
+        builder.Add(operation);
+
+        IOperation current = operation;
+
+        for (var i = 1; i < invocationSyntaxes.Length; i++)
         {
-            case MemberAccessExpressionSyntax memberAccess:
+            var expectedSyntax = invocationSyntaxes[i];
+            IOperation? parent = current.Parent;
+
+            while (parent is not null &&
+                   (parent is not IInvocationOperation || !HasSameSyntax(parent, expectedSyntax))
+            )
             {
-                if (memberAccess.Expression is InvocationExpressionSyntax innerInvocation &&
-                    !TryCollectInvocationChainCore(innerInvocation, builder)
-                )
-                {
-                    return false;
-                }
-
-                builder.Add(invocation);
-
-                return true;
+                parent = parent.Parent;
             }
-            case SimpleNameSyntax:
-            {
-                builder.Add(invocation);
 
-                return true;
-            }
-            default:
+            if (parent is not IInvocationOperation parentInvocation)
             {
+                invocations = ImmutableArray<IInvocationOperation>.Empty;
+
                 return false;
             }
+
+            builder.Add(parentInvocation);
+            current = parentInvocation;
         }
+
+        invocations = builder.ToImmutable();
+
+        return true;
+    }
+
+    private static bool HasSameSyntax(IOperation operation, SyntaxNode syntaxNode)
+    {
+        return operation.Syntax.SyntaxTree == syntaxNode.SyntaxTree && operation.Syntax.Span == syntaxNode.Span;
     }
 
     private static bool TryGetImplementationOfTarget(
@@ -423,9 +547,31 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         TypeSyntax TypeSyntax
     );
 
+    private readonly record struct BuilderMemberKey(
+        string ApiName,
+        ImmutableArray<DelegateSignatureKey> DelegateSignatures
+    );
+
+    private readonly record struct DelegateSignatureKey(
+        ITypeSymbol? ReturnType,
+        ImmutableArray<ITypeSymbol> ParameterTypes
+    );
+
+    private readonly record struct PropertySignatureKey(
+        string ApiName,
+        ITypeSymbol Type,
+        ImmutableArray<ITypeSymbol> ParameterTypes
+    );
+
     private readonly record struct RequiredBuilderMember(
-        string Key,
-        string Description
+        BuilderMemberKey Key,
+        ISymbol Symbol,
+        RequiredBuilderMemberKind Kind
+    );
+
+    private readonly record struct RequiredBuilderMembersResult(
+        bool IsValid,
+        ImmutableArray<RequiredBuilderMember> Members
     );
 
     private readonly record struct PropertyRequirement(
@@ -433,4 +579,114 @@ public sealed class ImplementationBuilderAnalyzer : DiagnosticAnalyzer
         bool RequiresGetter,
         bool RequiresSetter
     );
+
+    private enum RequiredBuilderMemberKind
+    {
+        Method,
+        Property,
+        Indexer,
+    }
+
+    private sealed class BuilderMemberKeyComparer : IEqualityComparer<BuilderMemberKey>
+    {
+        public static BuilderMemberKeyComparer Instance { get; } = new();
+
+        public bool Equals(BuilderMemberKey left, BuilderMemberKey right)
+        {
+            if (!StringComparer.Ordinal.Equals(left.ApiName, right.ApiName) ||
+                left.DelegateSignatures.Length != right.DelegateSignatures.Length
+            )
+            {
+                return false;
+            }
+
+            for (var i = 0; i < left.DelegateSignatures.Length; i++)
+            {
+                var leftSignature = left.DelegateSignatures[i];
+                var rightSignature = right.DelegateSignatures[i];
+
+                if (!SymbolEqualityComparer.Default.Equals(leftSignature.ReturnType, rightSignature.ReturnType) ||
+                    !TypeArraysEqual(leftSignature.ParameterTypes, rightSignature.ParameterTypes)
+                )
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public int GetHashCode(BuilderMemberKey key)
+        {
+            var hashCode = StringComparer.Ordinal.GetHashCode(key.ApiName);
+            hashCode = unchecked(hashCode * 31 + key.DelegateSignatures.Length);
+
+            foreach (var signature in key.DelegateSignatures)
+            {
+                hashCode = AddTypeHashCode(hashCode, signature.ReturnType);
+                hashCode = unchecked(hashCode * 31 + signature.ParameterTypes.Length);
+
+                foreach (var parameterType in signature.ParameterTypes)
+                {
+                    hashCode = AddTypeHashCode(hashCode, parameterType);
+                }
+            }
+
+            return hashCode;
+        }
+    }
+
+    private sealed class PropertySignatureKeyComparer : IEqualityComparer<PropertySignatureKey>
+    {
+        public static PropertySignatureKeyComparer Instance { get; } = new();
+
+        public bool Equals(PropertySignatureKey left, PropertySignatureKey right)
+        {
+            return StringComparer.Ordinal.Equals(left.ApiName, right.ApiName) &&
+                   SymbolEqualityComparer.Default.Equals(left.Type, right.Type) &&
+                   TypeArraysEqual(left.ParameterTypes, right.ParameterTypes);
+        }
+
+        public int GetHashCode(PropertySignatureKey key)
+        {
+            var hashCode = StringComparer.Ordinal.GetHashCode(key.ApiName);
+            hashCode = AddTypeHashCode(hashCode, key.Type);
+            hashCode = unchecked(hashCode * 31 + key.ParameterTypes.Length);
+
+            foreach (var parameterType in key.ParameterTypes)
+            {
+                hashCode = AddTypeHashCode(hashCode, parameterType);
+            }
+
+            return hashCode;
+        }
+    }
+
+    private static bool TypeArraysEqual(
+        ImmutableArray<ITypeSymbol> left,
+        ImmutableArray<ITypeSymbol> right
+    )
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Length; i++)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(left[i], right[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int AddTypeHashCode(int hashCode, ITypeSymbol? typeSymbol)
+    {
+        return unchecked(hashCode * 31 + (typeSymbol is null
+            ? 0
+            : SymbolEqualityComparer.Default.GetHashCode(typeSymbol)));
+    }
 }
