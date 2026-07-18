@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using static Microsoft.CodeAnalysis.MethodKind;
+
 namespace Macaron.InlineInterface;
 
 public static class InterfaceValidator
@@ -128,8 +130,8 @@ public static class InterfaceValidator
                 case IMethodSymbol { IsStatic: false } method:
                 {
                     if (method.MethodKind
-                        is MethodKind.EventAdd or MethodKind.EventRemove
-                        or MethodKind.PropertyGet or MethodKind.PropertySet
+                        is EventAdd or EventRemove
+                        or PropertyGet or PropertySet
                     )
                     {
                         break;
@@ -156,6 +158,38 @@ public static class InterfaceValidator
                     }
 
                     methodSymbolsBuilder.Add(method);
+
+                    break;
+                }
+                case IPropertySymbol { IsStatic: true, IsAbstract: true } property:
+                {
+                    issuesBuilder.Add(new InterfaceValidationIssue(
+                        Kind: InterfaceValidationIssueKind.NotAllowedStaticAbstractMember,
+                        MemberName: property.Name
+                    ));
+
+                    break;
+                }
+                case IEventSymbol { IsStatic: true, IsAbstract: true } @event:
+                {
+                    issuesBuilder.Add(new InterfaceValidationIssue(
+                        Kind: InterfaceValidationIssueKind.NotAllowedStaticAbstractMember,
+                        MemberName: @event.Name
+                    ));
+
+                    break;
+                }
+                case IMethodSymbol
+                {
+                    IsStatic: true,
+                    IsAbstract: true,
+                    MethodKind: not (EventAdd or EventRemove or PropertyGet or PropertySet)
+                } method:
+                {
+                    issuesBuilder.Add(new InterfaceValidationIssue(
+                        Kind: InterfaceValidationIssueKind.NotAllowedStaticAbstractMember,
+                        MemberName: method.Name
+                    ));
 
                     break;
                 }

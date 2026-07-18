@@ -244,6 +244,63 @@ public partial class InlineInterfaceGeneratorTests
     }
 
     [Test]
+    public void ReportsDiagnosticWhenTargetInterfaceContainsStaticAbstractMember()
+    {
+        var (diagnostics, generatedCodes) = CompileAndGetResults<InlineInterfaceGenerator>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IFactory
+            {
+                static abstract IFactory Create();
+            }
+
+            public class Test { void M() => Implementation.Of<IFactory>(); }
+            """,
+            additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
+        );
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MII0010");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.GetMessage(), Does.Contain("Create"));
+            Assert.That(generatedCodes, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ReportsDiagnosticWhenInheritedInterfaceContainsStaticAbstractMember()
+    {
+        var (diagnostics, generatedCodes) = CompileAndGetResults<InlineInterfaceGenerator>(
+            sourceCode:
+            """
+            using Macaron.InlineInterface;
+
+            public interface IBaseFactory
+            {
+                static abstract int Count { get; }
+            }
+
+            public interface IFactory : IBaseFactory { }
+
+            public class Test { void M() => Implementation.Of<IFactory>(); }
+            """,
+            additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
+        );
+        var matchingDiagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Id == "MII0010")
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(matchingDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(matchingDiagnostics[0].GetMessage(), Does.Contain("Count"));
+            Assert.That(generatedCodes, Is.Empty);
+        });
+    }
+
+    [Test]
     public void ReportsDiagnosticWhenTargetInterfaceIsPrivate()
     {
         AssertDiagnostic(

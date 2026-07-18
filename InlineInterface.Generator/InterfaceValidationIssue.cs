@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using static Macaron.InlineInterface.InterfaceValidationIssueKind;
+
 namespace Macaron.InlineInterface;
 
 public readonly record struct InterfaceValidationIssue(
@@ -13,23 +15,28 @@ public readonly record struct InterfaceValidationIssue(
     {
         return Kind switch
         {
-            InterfaceValidationIssueKind.NotAllowedEventModifier =>
-                InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(typeSyntax, MemberName),
-            InterfaceValidationIssueKind.NotAllowedGenericMethod =>
-                InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(typeSyntax, MemberName),
-            InterfaceValidationIssueKind.NotAllowedMethodModifier =>
-                InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(typeSyntax, MemberName),
-            InterfaceValidationIssueKind.UnexpectedMemberType =>
-                InlineInterfaceDiagnosticFactory.UnexpectedMemberType(typeSyntax, MemberKind, MemberName),
+            NotAllowedEventModifier => InlineInterfaceDiagnosticFactory.NotAllowedEventModifier(
+                typeSyntax,
+                MemberName
+            ),
+            NotAllowedGenericMethod => InlineInterfaceDiagnosticFactory.NotAllowedGenericMethod(
+                typeSyntax,
+                MemberName
+            ),
+            NotAllowedMethodModifier => InlineInterfaceDiagnosticFactory.NotAllowedMethodModifier(
+                typeSyntax,
+                MemberName
+            ),
+            NotAllowedStaticAbstractMember => InlineInterfaceDiagnosticFactory.NotAllowedStaticAbstractMember(
+                typeSyntax,
+                MemberName
+            ),
+            UnexpectedMemberType => InlineInterfaceDiagnosticFactory.UnexpectedMemberType(
+                typeSyntax,
+                MemberKind,
+                MemberName
+            ),
             _ => throw new InvalidOperationException("Unexpected interface validation issue."),
         };
     }
-}
-
-public enum InterfaceValidationIssueKind
-{
-    NotAllowedEventModifier,
-    NotAllowedGenericMethod,
-    NotAllowedMethodModifier,
-    UnexpectedMemberType,
 }

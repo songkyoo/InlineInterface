@@ -84,4 +84,13 @@ public static class InlineInterfaceDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor NotAllowedStaticAbstractMemberRule = new(
+        id: "MII0010",
+        title: "Static abstract interface members are not supported",
+        messageFormat: "Static abstract member '{1}' in target interface '{0}' is not supported. Inline interfaces cannot implement static abstract members.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 }

@@ -499,6 +499,38 @@ public partial class InlineInterfaceGeneratorTests
         Assert.That(generatedCodes, Is.Empty);
     }
 
+    [Test]
+    public void TargetTypeExtractorIgnoresUnrelatedGenericInvocationWithConstraintFailure()
+    {
+        var (diagnostics, generatedCodes) = CompileAndGetResults<TargetTypeExtractorTestGenerator>(
+            sourceCode:
+            """
+            namespace Macaron.InlineInterface.Tests;
+
+            public static class SomethingElse
+            {
+                public static T Of<T>() where T : struct => default;
+            }
+
+            public interface IBuffer { }
+
+            public class TestClass
+            {
+                public void TestMethod()
+                {
+                    _ = SomethingElse.Of<IBuffer>();
+                }
+            }
+            """
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Has.None.StartsWith("MII"));
+            Assert.That(generatedCodes, Is.Empty);
+        });
+    }
+
     private sealed class TargetTypeExtractorTestGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)

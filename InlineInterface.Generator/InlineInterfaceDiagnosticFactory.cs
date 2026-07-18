@@ -59,6 +59,15 @@ public static class InlineInterfaceDiagnosticFactory
         );
     }
 
+    public static Diagnostic NotAllowedStaticAbstractMember(TypeSyntax typeSyntax, string memberName)
+    {
+        return Diagnostic.Create(
+            descriptor: InlineInterfaceDiagnostics.NotAllowedStaticAbstractMemberRule,
+            location: typeSyntax.GetLocation(),
+            messageArgs: [typeSyntax, memberName]
+        );
+    }
+
     public static Diagnostic UnexpectedMemberType(TypeSyntax typeSyntax, SymbolKind memberKind, string memberName)
     {
         return Diagnostic.Create(

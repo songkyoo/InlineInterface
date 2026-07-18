@@ -1,8 +1,10 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static Macaron.InlineInterface.SymbolHelpers;
+
 using static Microsoft.CodeAnalysis.Accessibility;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+using static Microsoft.CodeAnalysis.TypeKind;
 
 namespace Macaron.InlineInterface;
 
@@ -26,38 +28,46 @@ public static class TargetTypeExtractor
         }
 
         var semanticModel = generatorSyntaxContext.SemanticModel;
-        var methodSymbol = ModelExtensions
-            .GetSymbolInfo(
-                semanticModel,
-                genericNameSyntax,
-                cancellationToken
-            )
-            .Symbol as IMethodSymbol;
+        var symbolInfo = semanticModel.GetSymbolInfo(genericNameSyntax, cancellationToken);
+        var methodSymbol = symbolInfo.Symbol as IMethodSymbol;
 
-        if (methodSymbol?.IsStatic is not true ||
-            methodSymbol.Name != "Of" ||
-            !IsImplementationType(methodSymbol.ContainingType)
-        )
+        if (!IsTargetMethod(methodSymbol))
         {
-            return TargetTypeDiscoveryResult.NotApplicable.Instance;
+            methodSymbol = null;
+
+            foreach (var candidateSymbol in symbolInfo.CandidateSymbols)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (candidateSymbol is IMethodSymbol candidateMethod && IsTargetMethod(candidateMethod))
+                {
+                    methodSymbol = candidateMethod;
+
+                    break;
+                }
+            }
+
+            if (methodSymbol is null)
+            {
+                return TargetTypeDiscoveryResult.NotApplicable.Instance;
+            }
         }
 
         var typeArgumentSyntax = genericNameSyntax.TypeArgumentList.Arguments[0];
 
-        if (methodSymbol.TypeArguments is not [INamedTypeSymbol { OriginalDefinition: { } typeSymbol }]
-        )
+        if (methodSymbol!.TypeArguments is not [INamedTypeSymbol { OriginalDefinition: { } typeSymbol }])
         {
             return TargetTypeDiscoveryResult.NotApplicable.Instance;
         }
 
-        if (typeSymbol.TypeKind != TypeKind.Interface)
+        if (typeSymbol.TypeKind != Interface)
         {
             return new TargetTypeDiscoveryResult.Failure(
                 InlineInterfaceDiagnosticFactory.TargetTypeMustBeInterface(typeArgumentSyntax)
             );
         }
 
-        if (typeArgumentSyntax.IsKind(SyntaxKind.NullableType))
+        if (typeArgumentSyntax.IsKind(NullableType))
         {
             return new TargetTypeDiscoveryResult.Failure(
                 InlineInterfaceDiagnosticFactory.TargetTypeCannotBeNullable(typeArgumentSyntax)
@@ -117,6 +127,11 @@ public static class TargetTypeExtractor
                 },
             },
         };
+    }
+
+    private static bool IsTargetMethod(IMethodSymbol? methodSymbol)
+    {
+        return methodSymbol is { IsStatic: true, Name: "Of" } && IsImplementationType(methodSymbol.ContainingType);
     }
 
     private static bool IsAccessibleFromGeneratedCode(INamedTypeSymbol typeSymbol)

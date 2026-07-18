@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="InlineInterface/InlineInterface.csproj" />
+  <Project Path="InlineInterface.Generator/InlineInterface.Generator.csproj" />
+  <Project Path="InlineInterface.Tests/InlineInterface.Tests.csproj" />
+</Solution>
