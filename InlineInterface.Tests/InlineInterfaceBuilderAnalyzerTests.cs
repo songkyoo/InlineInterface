@@ -23,7 +23,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0008"
+            expectedDiagnosticId: "MAII0008"
         );
     }
 
@@ -49,7 +49,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0008"
+            expectedDiagnosticId: "MAII0008"
         );
     }
 
@@ -77,7 +77,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0009"
+            expectedDiagnosticId: "MAII0009"
         );
     }
 
@@ -111,7 +111,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0009"
+            expectedDiagnosticId: "MAII0009"
         );
     }
 
@@ -139,7 +139,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -171,7 +171,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0008"
+            diagnosticId: "MAII0008"
         );
 
         AssertNoAnalyzerDiagnostic<ImplementationBuilderAnalyzer>(
@@ -199,7 +199,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -225,7 +225,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """
-        ).Where(diagnostic => diagnostic.Id == "MII0009").ToArray();
+        ).Where(diagnostic => diagnostic.Id == "MAII0009").ToArray();
 
         Assert.That(diagnostics, Has.Length.EqualTo(2));
     }
@@ -252,7 +252,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """
-        ).Where(diagnostic => diagnostic.Id == "MII0009").ToArray();
+        ).Where(diagnostic => diagnostic.Id == "MAII0009").ToArray();
 
         Assert.That(diagnostics, Has.Length.EqualTo(2));
         Assert.That(
@@ -290,7 +290,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -319,7 +319,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -350,7 +350,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -377,7 +377,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -402,7 +402,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """
-        ).Single(diagnostic => diagnostic.Id == "MII0009");
+        ).Single(diagnostic => diagnostic.Id == "MAII0009");
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("indexer 'this[int x, int y]'"));
     }
@@ -433,7 +433,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -472,7 +472,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -509,7 +509,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -534,7 +534,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 
@@ -563,7 +563,7 @@ public partial class InlineInterfaceGeneratorTests
             """
         ).Select(diagnostic => diagnostic.Id).ToArray();
 
-        Assert.That(diagnosticIds, Has.None.Matches("MII0009"));
+        Assert.That(diagnosticIds, Has.None.Matches("MAII0009"));
     }
 
     [Test]
@@ -594,7 +594,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            diagnosticId: "MII0009"
+            diagnosticId: "MAII0009"
         );
     }
 }

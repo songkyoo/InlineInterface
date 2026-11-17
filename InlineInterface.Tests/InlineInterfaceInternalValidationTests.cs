@@ -158,7 +158,7 @@ public partial class InlineInterfaceGeneratorTests
         Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Failure>());
 
         var failure = (TargetInterfaceValidationResult.Failure)result;
-        var diagnostic = failure.Diagnostics.Single(diagnostic => diagnostic.Id == "MII0003");
+        var diagnostic = failure.Diagnostics.Single(diagnostic => diagnostic.Id == "MAII0003");
 
         Assert.That(diagnostic.Location.SourceSpan, Is.EqualTo(typeSyntax.Span));
     }
@@ -199,7 +199,7 @@ public partial class InlineInterfaceGeneratorTests
         Assert.That(result, Is.TypeOf<TargetInterfaceValidationResult.Failure>());
 
         var failure = (TargetInterfaceValidationResult.Failure)result;
-        Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MII0007"));
+        Assert.That(failure.Diagnostics.Select(diagnostic => diagnostic.Id), Has.Some.EqualTo("MAII0007"));
     }
 
     [Test]
@@ -467,7 +467,7 @@ public partial class InlineInterfaceGeneratorTests
 
         Assert.That(
             diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
-            Has.Some.EqualTo("MII0001")
+            Has.Some.EqualTo("MAII0001")
         );
     }
 
@@ -526,7 +526,7 @@ public partial class InlineInterfaceGeneratorTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Has.None.StartsWith("MII"));
+            Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Has.None.StartsWith("MAII"));
             Assert.That(generatedCodes, Is.Empty);
         });
     }

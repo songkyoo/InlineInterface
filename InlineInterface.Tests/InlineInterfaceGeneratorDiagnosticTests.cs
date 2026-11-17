@@ -38,11 +38,11 @@ public partial class InlineInterfaceGeneratorTests
         {
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.Id),
-                Has.Some.EqualTo("MII0001")
+                Has.Some.EqualTo("MAII0001")
             );
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.Id),
-                Has.Some.EqualTo("MII0003")
+                Has.Some.EqualTo("MAII0003")
             );
             Assert.That(generatedCodes, Has.Length.EqualTo(1));
         });
@@ -73,7 +73,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0007"
+            expectedDiagnosticId: "MAII0007"
         );
     }
 
@@ -102,7 +102,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0007"
+            expectedDiagnosticId: "MAII0007"
         );
     }
 
@@ -131,7 +131,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0007"
+            expectedDiagnosticId: "MAII0007"
         );
     }
 
@@ -147,7 +147,7 @@ public partial class InlineInterfaceGeneratorTests
 
             public class Test { void M() => Implementation.Of<NotAnInterface>(); }
             """,
-            expectedDiagnosticId: "MII0001"
+            expectedDiagnosticId: "MAII0001"
         );
     }
 
@@ -163,7 +163,7 @@ public partial class InlineInterfaceGeneratorTests
 
             public class Test { void M() { Implementation.Of<ITest?>(); } }
             """,
-            expectedDiagnosticId: "MII0002"
+            expectedDiagnosticId: "MAII0002"
         );
     }
 
@@ -179,7 +179,7 @@ public partial class InlineInterfaceGeneratorTests
 
             public class Test { void M() => Implementation.Of<IWithGenericMethod>(); }
             """,
-            expectedDiagnosticId: "MII0003"
+            expectedDiagnosticId: "MAII0003"
         );
     }
 
@@ -195,7 +195,7 @@ public partial class InlineInterfaceGeneratorTests
 
             public class Test { void M() => Implementation.Of<IWithRefParam>(); }
             """,
-            expectedDiagnosticId: "MII0004"
+            expectedDiagnosticId: "MAII0004"
         );
     }
 
@@ -217,7 +217,7 @@ public partial class InlineInterfaceGeneratorTests
                 void M() => Implementation.Of<IWithOutParam>();
             }
             """,
-            expectedDiagnosticId: "MII0004"
+            expectedDiagnosticId: "MAII0004"
         );
     }
 
@@ -239,7 +239,7 @@ public partial class InlineInterfaceGeneratorTests
                 void M() => Implementation.Of<IWithParamsParam>();
             }
             """,
-            expectedDiagnosticId: "MII0004"
+            expectedDiagnosticId: "MAII0004"
         );
     }
 
@@ -260,7 +260,7 @@ public partial class InlineInterfaceGeneratorTests
             """,
             additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
         );
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MII0010");
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MAII0010");
 
         Assert.Multiple(() =>
         {
@@ -289,7 +289,7 @@ public partial class InlineInterfaceGeneratorTests
             additionalAssemblies: [typeof(ImplementationOf<>).Assembly]
         );
         var matchingDiagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == "MII0010")
+            .Where(diagnostic => diagnostic.Id == "MAII0010")
             .ToArray();
 
         Assert.Multiple(() =>
@@ -321,7 +321,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0006"
+            expectedDiagnosticId: "MAII0006"
         );
     }
 
@@ -346,7 +346,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0006"
+            expectedDiagnosticId: "MAII0006"
         );
     }
 
@@ -374,7 +374,7 @@ public partial class InlineInterfaceGeneratorTests
                 }
             }
             """,
-            expectedDiagnosticId: "MII0006"
+            expectedDiagnosticId: "MAII0006"
         );
     }
 }
